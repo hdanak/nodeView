@@ -54,7 +54,11 @@ function Edge (start, end) {
         if (!start || !end) {
             return;
         }
-        draw_nice_bezier(start, end, start._node._context);
+        if (start.x < end.x) {
+            draw_nice_bezier(start, end, start._node._context, start._type == 'i');
+        } else {
+            draw_nice_bezier(start, end, start._node._context, start._type == 'o');
+        }
     }
     return self;
 }
@@ -87,6 +91,14 @@ function Connector (type, node) {
         self._node.scene.add_edge(self._edge);
     }
     self.disconnect = function () {
+        if (self._edge == null) {
+            return;
+        }
+        if (self._type == 'i') {
+            self._edge.start = null;
+        } else {
+            self._edge.end = null;
+        }
         self._node.scene.remove_edge(self._edge);
         self._edge = null;
     }
@@ -277,12 +289,17 @@ function Scene (canvas) {
         case 'BUBBLE':
             mode = 'CONNECT';
             var zone = find_zone(cursor.x, cursor.y);
-            if (zone.parent._type == 'i') {
-                selected = zone.parent._edge.start;
-                zone.parent.disconnect();
-            } else {
-                selected = zone.parent._edge.end;
-                zone.parent.disconnect();
+            if (zone.parent._edge != null) {
+                console.log(zone.parent._edge);
+                if (zone.parent._type == 'i') {
+                    selected = zone.parent._edge.start;
+                    selected.disconnect();
+                    target = null;
+                } else {
+                    selected = zone.parent._edge.end;
+                    selected.disconnect();
+                    target = null;
+                }
             }
             break;
         default:
@@ -395,8 +412,8 @@ function draw_nice_bezier (start, end, ctx, reverse) {
     };
     if (reverse) {
         ctx.moveTo(start.x, start.y);
-        ctx.bezierCurveTo(start.x, start.y - dist.h/3 * (end.y > start.y ? -1 : 1),
-                          start.x, end.y + dist.h/3 * (end.y > start.y ? -1 : 1),
+        ctx.bezierCurveTo(start.x, start.y + dist.h/3 * (end.y > start.y ? 1 : -1),
+                          end.x, end.y - dist.h/3 * (end.y > start.y ? 1 : -1),
                           end.x, end.y);
     } else {
         if (start.x > end.x) {
