@@ -9,13 +9,21 @@
     $('#canvas').ready(function () {
         var canvas = $('#canvas')[0];
         var scene = Scene(canvas);
-        var node = scene.add_node(50, 50, 100, 50);
-	node
-             .add_input()
-             .add_input()
-             .add_input()
-             .add_output();
-        scene.redraw();
+        scene.insert_node(
+            Node(50, 50, 100, 50)
+              .add_input()
+              .add_input()
+              .add_input()
+              .add_output()
+	);
+       	scene.insert_node(
+            Node(50, 50, 100, 50)
+              .add_input()
+              .add_input()
+              .add_input()
+              .add_output()
+	);
+        scene.draw();
     });
   </script>
  </body>

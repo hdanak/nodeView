@@ -1,3 +1,11 @@
+/*
+ * nodeView.js
+ * 
+ * Copyright 2011, Hike Danakian
+ * Licensed under the LGPL v.3
+ *
+ */
+
 function Point (x, y) {
     var self = new Object();
     self.x = x;
@@ -31,9 +39,6 @@ function Zone (x, y, w, h, type, par) {
          && self.x <= x
          && self.y + self.h >= y
          && self.y <= y) {
-            if (type == "endpoint") {
-                console.log("endpoint");
-            }
             return true;
         } else {
             return false;
@@ -49,6 +54,7 @@ function Edge (start, end) {
         if (!start || !end) {
             return;
         }
+        draw_nice_bezier(start, end, start._node._context);
     }
     return self;
 }
@@ -61,6 +67,7 @@ function Connector (type, node) {
     self.zone = Zone(node.zone.x, node.zone.y,
                      0, 0,
                      'endpoint', self);
+    self._edge = null;
     self._node = node;
     self._bubble = false;
     self.bubble = function (state) {
@@ -71,20 +78,30 @@ function Connector (type, node) {
         }
         node.scene.redraw();
     }
+    self.connect = function (target) {
+        if (self._type == 'i') {
+            self._edge = Edge(target, self);
+        } else {
+            self._edge = Edge(self, target);
+        }
+        self._node.scene.add_edge(self._edge);
+    }
+    self.disconnect = function () {
+        self._node.scene.remove_edge(self._edge);
+        self._edge = null;
+    }
     self.draw = function () {
         self.update();
         ctx = node._context;
+        //ctx.fillRect(self.zone.x, self.zone.y, self.zone.w, self.zone.h);
         ctx.beginPath();
-        if (self._bubble) {
-            radius = 2;
-        }
         var arc_start = Math.PI/2 * (self._type == 'i' ? 1 : -1);
         ctx.arc(self.x + (self._type == 'i' ? -1 : 1) * self._bubble, self.y,
-                radius, arc_start, -arc_start, false);
+                radius - self._bubble, arc_start, -arc_start, false);
         ctx.closePath();
         if (self._bubble) {
             ctx.save();
-            ctx.lineWidth += 2;
+            ctx.lineWidth = 4;
             ctx.stroke();
             ctx.fill();
             ctx.restore();
@@ -93,13 +110,17 @@ function Connector (type, node) {
         }
     }
     self.update = function () {
+        var dot_width = radius + 2 * node._context.lineWidth;
         self.x = node.x + (self._type == 'i' ? 0 : node.w);
         self.y = node.y + node.corner_radius
                     + (node.h - node.corner_radius * 2) * self._number/(self._list.length + 1);
 
-        self.zone.move(self.x + (self._type == 'i' ? -radius : radius), self.y);
-        self.zone.resize(2 * radius, (node.h - node.corner_radius * 2)
-                                / self._list.length);
+        self.zone.move(self.x + (self._type == "i" ? -radius/2 - 5 : radius/2 - 3),
+                       self.y - radius - 1);
+        self.zone.resize(dot_width + 4,
+                         radius * 2 + 2);
+//        self.zone.resize(radius + dot_width,
+//                         (node.h - node.corner_radius * 2)/self._list.length);
     }
     return self;
 }
@@ -113,15 +134,8 @@ function Output (node) {
 }
 function Node (x, y, w, h, scene) {
     var self = new Rect(x, y, w, h);
-    self.corner_radius = 3;
+    self.corner_radius = 5;
     self.zone = Zone(x, y, w, h, 'node', self);
-    self.get_zones = function () {
-        var ret_arr = new Array();
-        ret_arr = ret_arr.concat(self.inputs.map(function(x){return x.zone}),
-                                 self.outputs.map(function(x){return x.zone}));
-        ret_arr.push(self.zone);
-        return ret_arr;
-    }
     self.inputs = [];
     self.outputs = [];
     self.add_input = function () {
@@ -132,10 +146,37 @@ function Node (x, y, w, h, scene) {
         self.outputs.push(Output(self));
         return self;
     }
+    self.find_zone = function (x, y) {
+        for (var i in self.inputs) {
+            if (self.inputs[i].zone.check_collides(x, y)) {
+                return self.inputs[i].zone;
+            }
+        }
+        for (var o in self.outputs) {
+            if (self.outputs[o].zone.check_collides(x, y)) {
+                return self.outputs[o].zone;
+            }
+        }
+        if (self.zone.check_collides(x, y)) {
+            return self.zone;
+        }
+    }
+    self.get_zones = function () {
+        var ret_arr = new Array();
+        ret_arr = ret_arr.concat(self.inputs.map(function(x){return x.zone}),
+                                 self.outputs.map(function(x){return x.zone}));
+        ret_arr.push(self.zone);
+        return ret_arr;
+    }
     self.scene = scene;
-    self._context = scene.context;
+    self._context = scene ? scene.context : null;
+    self.set_scene = function (scene) {
+        self.scene = scene;
+        self._context = scene.context;
+    }
     self.draw = function () {
         var ctx = self._context;
+        //ctx.fillRect(self.zone.x, self.zone.y, self.zone.w, self.zone.h);
         ctx.beginPath();
         ctx.moveTo(self.x + self.corner_radius, self.y);
         ctx.lineTo(self.x + self.w - self.corner_radius, self.y);
@@ -158,9 +199,10 @@ function Node (x, y, w, h, scene) {
     self.move = function (x, y) {
         self.x = x;
         self.y = y;
-        self.zone.move(x + 10, y);
+        self.zone.move(x, y);
         self.inputs.map(function(x) {x.update()});
         self.outputs.map(function(x) {x.update()});
+        return self;
     }
     return self;
 }
@@ -169,59 +211,143 @@ function Scene (canvas) {
     self.canvas = canvas;
     self.context = canvas.getContext("2d");
     self.nodes = new Array();
-    self.zones = new Array();
-    self.add_node = function () {
-        var node = Node.apply(null, Array.prototype.slice.call(arguments).concat(self));
-        self.nodes.push(node);
-        self.zones = self.zones.concat(node.get_zones());
-        return node;
+    self.edges = new Array();
+    // privates
+    var mode = 'NONE';
+    var selected = null;
+    var target = null;
+    var offset = Point(0,0);
+    var cursor = {x: 0, y: 0};
+
+    self.add_edge = function (edge) {
+        self.edges.push(edge);
     }
+    self.remove_edge = function (edge) {
+        var pos = self.edges.indexOf(edge);
+        if (pos < 0) {
+            return;
+        }
+        self.edges.splice(pos, 1);
+    }
+    self.add_node = function (node) {
+        node.set_scene(self);
+        self.nodes.push(node);
+        return self;
+    }
+    self.insert_node = function (node) {
+        if (mode != 'NONE') {
+            setTimeout(
+                function () {
+                    node.set_scene(self);
+                    self.insert_node(node.move(cursor.x, cursor.y))
+                }, 400);
+            return;
+        }
+        self.add_node(node);
+        selected = node;
+        mode = 'DRAG';
+        node.draw();
+    }
+    self.draw = 
     self.redraw = function () {
         self.context.clearRect(0,0,self.canvas.width, self.canvas.height);
         for (var n in self.nodes) {
             self.nodes[n].draw();
         }
+        for (var e in self.edges) {
+            self.edges[e].draw();
+        }
     }
     function find_zone (x, y) {
-        for (var i in self.zones) {
-            if (self.zones[i].check_collides(x, y)) {
-                return self.zones[i];
+        for (var n in self.nodes) {
+            if (zone = self.nodes[n].find_zone(x, y)) {
+                return zone;
             }
         }
     }
 
-    var mode = 'NONE';
-    var selected = null;
-    var offset = Point(0,0);
     canvas.addEventListener('mousedown', function (ev) {
-        var node;
-        var cursor = get_mouse_cursor(ev);
-        if (zone = find_zone(cursor.x, cursor.y)) {
-            switch (zone.type) {
-            case 'node':
-                mode = 'DRAG';
-                selected = zone.parent;
-                offset = Point(cursor.x - zone.parent.x,
-                               cursor.y - zone.parent.y);
-                break;
-            case 'endpoint':
-                mode = 'CONNECT';
-                break;
+        switch (mode) {
+        case 'DRAG':
+            mode = 'NONE';
+            selected = 'NONE';
+            break;
+        case 'CONNECT':
+            break;
+        case 'BUBBLE':
+            mode = 'CONNECT';
+            var zone = find_zone(cursor.x, cursor.y);
+            if (zone.parent._type == 'i') {
+                selected = zone.parent._edge.start;
+                zone.parent.disconnect();
+            } else {
+                selected = zone.parent._edge.end;
+                zone.parent.disconnect();
+            }
+            break;
+        default:
+            var zone = find_zone(cursor.x, cursor.y);
+            if (zone) {
+                switch (zone.type) {
+                case 'node':
+                    mode = 'DRAG';
+                    selected = zone.parent;
+                    offset = Point(cursor.x - zone.parent.x,
+                                   cursor.y - zone.parent.y);
+                    break;
+                }
             }
         }
     }, false);
     canvas.addEventListener('mouseup', function (ev) {
-        mode = 'NONE';
-        selected = null;
+        switch (mode) {
+        case 'CONNECT':
+            if (target != null) {
+                selected.connect(target);
+
+                target.bubble(false);
+                target = null;
+            }
+            selected.bubble(false);
+            selected = null;
+            mode = 'NONE';
+            break;
+        case 'BUBBLE':
+            break;
+        default:
+            mode = 'NONE';
+            selected = null;
+        }
     }, false);
     canvas.addEventListener('mousemove', function (ev) {
-        var cursor = get_mouse_cursor(ev);
+        cursor = get_mouse_cursor(ev);
         switch (mode) {
         case 'DRAG':
             selected.move(cursor.x-offset.x, cursor.y-offset.y);
             self.redraw();
             break;
         case 'CONNECT':
+            if (zone = find_zone(cursor.x, cursor.y)) {
+                if (zone.type == 'endpoint'
+                        && zone.parent._type != selected._type) {
+                    if (target != null && target != zone.parent) {
+                        target.bubble(false);
+                    }
+                    zone.parent.bubble();
+                    target = zone.parent;
+                }
+            } else if (target != null) {
+                    target.bubble(false);
+                    target = null;
+            }
+
+            self.redraw();
+            if (selected.x < cursor.x) {
+                draw_nice_bezier(selected, cursor, self.context, selected._type == 'i');
+            } else {
+                draw_nice_bezier(selected, cursor, self.context, selected._type == 'o');
+            }
+
             break;
         case 'BUBBLE':
             if (selected.zone != find_zone(cursor.x, cursor.y)) {
@@ -255,7 +381,36 @@ function get_mouse_cursor (ev) {
         x = ev.offsetX;
         y = ev.offsetY;
     }
-    return {'x':x, 'y':y};
+    return {
+        'x': x - 10,
+        'y': y - 10
+    };
+}
+
+function draw_nice_bezier (start, end, ctx, reverse) {
+    ctx.save();
+    var dist = {
+        w: Math.abs(end.x - start.x),
+        h: Math.abs(end.y - start.y)
+    };
+    if (reverse) {
+        ctx.moveTo(start.x, start.y);
+        ctx.bezierCurveTo(start.x, start.y - dist.h/3 * (end.y > start.y ? -1 : 1),
+                          start.x, end.y + dist.h/3 * (end.y > start.y ? -1 : 1),
+                          end.x, end.y);
+    } else {
+        if (start.x > end.x) {
+            var tmp = start;
+            start = end;
+            end = tmp;
+        }
+        ctx.moveTo(start.x, start.y);
+        ctx.bezierCurveTo(start.x + dist.w/3, start.y,
+                          end.x - dist.w/3, end.y,
+                          end.x, end.y);
+    }
+    ctx.stroke();
+    ctx.restore();
 }
 
 // vim: ts=4 sw=4 et sts=0
