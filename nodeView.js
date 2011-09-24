@@ -47,11 +47,11 @@ function Edge (start, end) {
     }
     return self;
 }
-function EndPoint (type, node) {
+function Connector (type, node) {
     var self = Point(node.zone.x, node.zone.y);
-    self._type = type.toLowerCase();
-    self._list = self._type == 'input' ? node.inputs : node.outputs;
-    self._number = self._list.length;
+    self._type = type.toLowerCase().charAt(0);
+    self._list = self._type == 'i' ? node.inputs : node.outputs;
+    self._number = self._list.length + 1;
     self.zone = Zone(node.zone.x, node.zone.y,
                      0, 0,
                      'endpoint', self);
@@ -73,15 +73,14 @@ function EndPoint (type, node) {
         if (self._bubble) {
             radius = 2;
         }
-//        ctx.fillRect(self.zone.x, self.zone.y, self.zone.w, self.zone.h - 1);
-        ctx.arc(self.x, self.y,
-                radius, 0, 7, false);
+        var arc_start = Math.PI/2 * (self._type == 'i' ? 1 : -1);
+        ctx.arc(self.x + (self._type == 'i' ? -1 : 1) * self._bubble, self.y,
+                radius, arc_start, -arc_start, false);
         ctx.closePath();
         if (self._bubble) {
             ctx.save();
-            ctx.lineWidth = 6;
+            ctx.lineWidth += 2;
             ctx.stroke();
-            ctx.fillStyle = '#FFF';
             ctx.fill();
             ctx.restore();
         } else {
@@ -89,30 +88,27 @@ function EndPoint (type, node) {
         }
     }
     self.update = function () {
-        switch (self._type) {
-        case 'input':
-            break;
-        case 'output':
-            break;
-        }
-        self.x = node.x;
-        self.y = node.y;
-        self.zone.move(self.x, self.y + self._number * node.y
-                                        /self._list.length);
-        self.zone.resize(20, (node.y-20)/self._list.length);
+        self.x = node.x + (self._type == 'i' ? 0 : node.w);
+        self.y = node.y + node.corner_radius
+                    + (node.h - node.corner_radius * 2) * self._number/(self._list.length + 1);
+
+        self.zone.move(self.x, self.y);
+        self.zone.resize(20, (node.h - node.corner_radius * 2)
+                                / self._list.length);
     }
     return self;
 }
 function Input (node) {
-    var self = EndPoint('input', node);
+    var self = Connector('input', node);
     return self;
 }
 function Output (node) {
-    var self = EndPoint('output', node);
+    var self = Connector('output', node);
     return self;
 }
 function Node (x, y, w, h, scene) {
     var self = new Rect(x, y, w, h);
+    self.corner_radius = 3;
     self.zone = Zone(x, y, w, h, 'node', self);
     self.get_zones = function () {
         var ret_arr = new Array();
@@ -133,20 +129,19 @@ function Node (x, y, w, h, scene) {
     self._context = scene.context;
     self.draw = function () {
         var ctx = self._context;
-        var r = 10;
         ctx.beginPath();
-        ctx.moveTo(self.x + r, self.y);
-        ctx.lineTo(self.x + self.w - r, self.y);
+        ctx.moveTo(self.x + self.corner_radius, self.y);
+        ctx.lineTo(self.x + self.w - self.corner_radius, self.y);
         ctx.quadraticCurveTo(self.x + self.w, self.y,
-                             self.x + self.w, self.y + r);
-        ctx.lineTo(self.x + self.w, self.y + self.h - r);
+                             self.x + self.w, self.y + self.corner_radius);
+        ctx.lineTo(self.x + self.w, self.y + self.h - self.corner_radius);
         ctx.quadraticCurveTo(self.x + self.w, self.y + self.h,
-                             self.x + self.w - r, self.y + self.h);
-        ctx.lineTo(self.x + r, self.y + self.h);
+                             self.x + self.w - self.corner_radius, self.y + self.h);
+        ctx.lineTo(self.x + self.corner_radius, self.y + self.h);
         ctx.quadraticCurveTo(self.x, self.y + self.h,
-                             self.x, self.y + self.h - r);
-        ctx.lineTo(self.x, self.y + r);
-        ctx.quadraticCurveTo(self.x, self.y, self.x + r, self.y)
+                             self.x, self.y + self.h - self.corner_radius);
+        ctx.lineTo(self.x, self.y + self.corner_radius);
+        ctx.quadraticCurveTo(self.x, self.y, self.x + self.corner_radius, self.y)
         ctx.closePath();
         ctx.stroke();
 
@@ -184,6 +179,7 @@ $('#canvas').ready(function () {
     var canvas = $('#canvas')[0];
     var scene = Scene(canvas);
     var new_node = Node(50, 50, 100, 50, scene);
+    new_node.add_input();
     new_node.add_input();
     new_node.add_input();
     new_node.add_output();
