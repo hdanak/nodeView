@@ -1,7 +1,22 @@
 <html>
+ <head>
+  <script type="application/javascript" src="jquery-1.5.2.min.js"></script>
+  <script type="application/javascript" src="nodeView.js"></script>
+ </head>
  <body>
   <canvas id="canvas" width="600" height="600" style="border:1px solid"></canvas>
-  <script src="http://www.computejs.com/static/javascripts/jquery-1.5.2.min.js"></script>
-  <script type="application/javascript" src="nodeView.js"></script>
+  <script type="application/javascript">
+    $('#canvas').ready(function () {
+        var canvas = $('#canvas')[0];
+        var scene = Scene(canvas);
+        var node = scene.add_node(50, 50, 100, 50);
+	node
+             .add_input()
+             .add_input()
+             .add_input()
+             .add_output();
+        scene.redraw();
+    });
+  </script>
  </body>
 </html>
