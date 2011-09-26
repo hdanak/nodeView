@@ -167,6 +167,7 @@ function Node (x, y, w, h, scene) {
         if (self.zone.check_collides(x, y)) {
             return self.zone;
         }
+        return null;
     }
     self.get_zones = function () {
         var ret_arr = new Array();
@@ -241,7 +242,7 @@ function Scene (canvas) {
         self.nodes.push(node);
         return self;
     }
-    self.insert_node = function (node) {
+    self.add_node_interactive = function (node) {
         if (mode != 'NONE') {
             setTimeout(
                 function () {
@@ -254,6 +255,26 @@ function Scene (canvas) {
         selected = node;
         mode = 'DRAG';
         node.draw();
+    }
+    self.remove_node = function (node) {
+        var pos = self.nodes.indexOf(node);
+        if (pos < 0) {
+            return;
+        }
+        for (var i in node.inputs) {
+            if (node.inputs[i]._edge != null) {
+                node.inputs[i]._edge.disconnect();
+            }
+        }
+        for (var o in node.outputs) {
+            if (node.outputs[o]._edge != null) {
+                node.outputs[o]._edge.disconnect();
+            }
+        }
+        self.nodes.splice(pos, 1);
+    }
+    self.remove_node_interactive = function () {
+        mode = 'DELETE';
     }
     self.draw = 
     self.redraw = function () {
@@ -271,6 +292,7 @@ function Scene (canvas) {
                 return zone;
             }
         }
+        return null;
     }
 
     canvas.addEventListener('mousedown', function (ev) {
@@ -279,23 +301,25 @@ function Scene (canvas) {
             mode = 'NONE';
             selected = 'NONE';
             break;
+        case 'DELETE':
+            var zone = find_zone(cursor.x, cursor.y);
+            console.log(zone);
+            if (zone != null && zone.type == "node") {
+                self.remove_node(zone.parent);
+                self.redraw();
+            }
+            mode = 'NONE';
+            break;
         case 'CONNECT':
             break;
         case 'BUBBLE':
             mode = 'CONNECT';
             var zone = find_zone(cursor.x, cursor.y);
             if (zone.parent._edge != null) {
-                console.log(zone.parent._edge);
-                if (zone.parent._type == 'i') {
-                    console.log("hit");
-                    selected = zone.parent._edge.start;
-                    zone.parent._edge.disconnect();
-                    target = null;
-                } else {
-                    selected = zone.parent._edge.end;
-                    zone.parent._edge.disconnect();
-                    target = null;
-                }
+                selected = zone.parent._type == 'i' ? zone.parent._edge.start
+                                                    : zone.parent._edge.end;
+                zone.parent._edge.disconnect();
+                target = null;
             }
             break;
         default:
