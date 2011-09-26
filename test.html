@@ -2,29 +2,28 @@
  <head>
   <script type="application/javascript" src="jquery-1.5.2.min.js"></script>
   <script type="application/javascript" src="nodeView.js"></script>
- </head>
- <body>
-  <canvas id="canvas" width="600" height="600" style="border:1px solid"></canvas>
   <script type="application/javascript">
-    $('#canvas').ready(function () {
-        var canvas = $('#canvas')[0];
-        var scene = Scene(canvas);
+    var scene;
+    var canvas;
+    function new_node () {
         scene.insert_node(
-            Node(50, 50, 100, 50)
+            Node(0, 0, 100, 50)
               .add_input()
               .add_input()
               .add_input()
               .add_output()
 	);
-       	scene.insert_node(
-            Node(50, 50, 100, 50)
-              .add_input()
-              .add_input()
-              .add_input()
-              .add_output()
-	);
+    }
+    $('#canvas').ready(function () {
+        canvas = $('#canvas')[0];
+        scene = Scene(canvas);
         scene.draw();
     });
   </script>
+ </head>
+ <body>
+  <button type="button" onclick="new_node()" title="Add node"><img src="add.png"/></button>
+  <br />
+  <canvas id="canvas" width="600" height="600" style="position:relative; border:1px solid"></canvas>
  </body>
 </html>

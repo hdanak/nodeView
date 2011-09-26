@@ -60,6 +60,13 @@ function Edge (start, end) {
             draw_nice_bezier(start, end, start._node._context, start._type == 'o');
         }
     }
+    self.disconnect = function () {
+        self.start._node.scene.remove_edge(self);
+        self.start._edge = null;
+        self.end._edge = null;
+        self.start = null;
+        self.end = null;
+    }
     return self;
 }
 function Connector (type, node) {
@@ -89,18 +96,6 @@ function Connector (type, node) {
             self._edge = Edge(self, target);
         }
         self._node.scene.add_edge(self._edge);
-    }
-    self.disconnect = function () {
-        if (self._edge == null) {
-            return;
-        }
-        if (self._type == 'i') {
-            self._edge.start = null;
-        } else {
-            self._edge.end = null;
-        }
-        self._node.scene.remove_edge(self._edge);
-        self._edge = null;
     }
     self.draw = function () {
         self.update();
@@ -292,12 +287,13 @@ function Scene (canvas) {
             if (zone.parent._edge != null) {
                 console.log(zone.parent._edge);
                 if (zone.parent._type == 'i') {
+                    console.log("hit");
                     selected = zone.parent._edge.start;
-                    selected.disconnect();
+                    zone.parent._edge.disconnect();
                     target = null;
                 } else {
                     selected = zone.parent._edge.end;
-                    selected.disconnect();
+                    zone.parent._edge.disconnect();
                     target = null;
                 }
             }
@@ -399,8 +395,8 @@ function get_mouse_cursor (ev) {
         y = ev.offsetY;
     }
     return {
-        'x': x - 10,
-        'y': y - 10
+        'x': x,
+        'y': y
     };
 }
 
