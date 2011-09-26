@@ -103,17 +103,21 @@ function Connector (type, node) {
         //ctx.fillRect(self.zone.x, self.zone.y, self.zone.w, self.zone.h);
         ctx.beginPath();
         var arc_start = Math.PI/2 * (self._type == 'i' ? 1 : -1);
-        ctx.arc(self.x + (self._type == 'i' ? -1 : 1) * self._bubble, self.y,
+        ctx.arc(self.x + (self._type == 'i' ? -2 : 2) * self._bubble, self.y,
                 radius - self._bubble, arc_start, -arc_start, false);
         ctx.closePath();
         if (self._bubble) {
             ctx.save();
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 3;
             ctx.stroke();
-            ctx.fill();
             ctx.restore();
         } else {
+            ctx.save();
+            ctx.lineWidth = 1;
+            ctx.fillStyle = "#eee";
             ctx.fill();
+            ctx.stroke();
+            ctx.restore();
         }
     }
     self.update = function () {
@@ -214,10 +218,11 @@ function Node (x, y, w, h, scene) {
     }
     return self;
 }
-function Scene (canvas) {
+function Scene () {
     var self = new Object();
     self.canvas = canvas;
     self.context = canvas.getContext("2d");
+    self.context.translate(0.5, 0.5)
     self.nodes = new Array();
     self.edges = new Array();
     // privates
