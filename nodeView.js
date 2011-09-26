@@ -275,6 +275,7 @@ function Scene (canvas) {
     }
     self.remove_node_interactive = function () {
         mode = 'DELETE';
+        self.canvas.style.cursor = "crosshair";
     }
     self.draw = 
     self.redraw = function () {
@@ -303,11 +304,11 @@ function Scene (canvas) {
             break;
         case 'DELETE':
             var zone = find_zone(cursor.x, cursor.y);
-            console.log(zone);
             if (zone != null && zone.type == "node") {
                 self.remove_node(zone.parent);
                 self.redraw();
             }
+            self.canvas.style.cursor = "auto";
             mode = 'NONE';
             break;
         case 'CONNECT':
