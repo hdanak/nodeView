@@ -103,7 +103,7 @@ function Connector (type, node) {
         //ctx.fillRect(self.zone.x, self.zone.y, self.zone.w, self.zone.h);
         ctx.beginPath();
         var arc_start = Math.PI/2 * (self._type == 'i' ? 1 : -1);
-        ctx.arc(self.x + (self._type == 'i' ? -2 : 2) * self._bubble, self.y,
+        ctx.arc(self.x + (self._type == 'i' ? -1 : 1) * self._bubble, self.y,
                 radius - self._bubble, arc_start, -arc_start, false);
         ctx.closePath();
         if (self._bubble) {
