@@ -1,7 +1,7 @@
 /*
  * nodeView.js
- * 
- * Copyright 2011, Hike Danakian
+ *
+ * Copyright 2012, Hike Danakian
  * Licensed under the LGPL v.3
  *
  */
