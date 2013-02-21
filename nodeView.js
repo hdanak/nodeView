@@ -125,6 +125,8 @@ var Pin = Class({
         },
     },
 });
+//  XXX: Everything below is kept from the previous version for reference,
+//          and should be rewritten.
     self.connect = function (target) {
         if (self._type == 'i') {
             self._edge = Edge(target, self);
