@@ -4,32 +4,34 @@ var Signals = Class({
     {
         this.signal = { slots: {}, blocked: {} };
         this.signal.default = function () {};
+        this.signal._ = this;
     },
     methods: {
         signal: {
-            fire:       function (type)
+            fire:       function (type, data, self)
             {
-                if (!signal.blocked[type])
-                    ifndef(signal.slots[type], [signal.default]).map(
-                           function (fx) { fx() }, self);
-            };
-            slot:       function (type)
+                if (!this.blocked[type])
+                    ifndef(this.slots[type], [this.default]).map(
+                           function (fx) { fx.call(self, this, data) }, this._);
+            },
+            slot:       function (type, data, self)
             {
-                return function () { signal.fire(type) }
-            };
+                var signal = this;
+                return function () { signal.fire(type, data, self) }
+            },
             connect:    function (type, fx)
             {
-                signal.slots[type] = ifndef(signal.slots[type], []);
-                signal.slots[type].push(fx);
-            };
+                this.slots[type] = ifndef(this.slots[type], []);
+                this.slots[type].push(fx);
+            },
             block:      function (type)
             {
-                signal.blocked[type] = true;
-            };
+                this.blocked[type] = true;
+            },
             unblock:    function (type)
             {
-                signal.blocked[type] = false;
-            };
-        },
-    },
+                this.blocked[type] = false;
+            }
+        }
+    }
 });
