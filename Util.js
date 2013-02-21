@@ -16,31 +16,34 @@ function chain (fx, self)
         return self;
     };
 }
-Array.prototype.treemap = function (callback, thisArg) {
+Arr_proto = Array.prototype;
+Obj_proto = Object.prototype;
+Arr_proto.treemap = function (callback, thisArg) {
     return this.map(function (elem) {
         return (elem instanceof Array) ? elem.treemap(callback, thisArg)
-                                       : callback.call(thisArg, elem);
-    });
+                                       : thisArg ? callback.call(thisArg, elem);
+                                                 : callback(elem) });
+};
+Arr_proto.extend  = function () {
+    Arr_proto.map.call(arguments, function (item) {this.push(item)}, this);
+    return this.length;
+};
+Arr_proto.merge   = function () {
+    Arr_proto.treemap.call(arguments, function (item) {this.push(item)}, this);
+    return this.length;
+};
+Obj_proto.map    = function (callback, thisArg) {
+    var output = [];
+    for (var k in this)
+        output.push(thisArg ? callback.call(thisArg, k, this[k])
+                            : callback(k, this[k]))
+    return output;
 }
-Array.prototype.merge   = function () {
-    Array.prototype.treemap.call(arguments, function (item) {
-        this.push(item)
-    }, this);
-    return this.length;
-};
-Array.prototype.extend  = function () {
-    Array.prototype.map.call(arguments, function (item) {
-        this.push(item)
-    }, this);
-    return this.length;
-};
-Object.prototype.merge  = function () {
-    Array.prototype.treemap.call(arguments, function (map) {
-        for (var i in map) this[i] = map[i];
+Obj_proto.extend = function () {
+    Arr_proto.map.call(arguments, function (map) {
+        for (var k in map) this[k] = map[k];
     }, this);
 };
-Object.prototype.extend = function () {
-    Array.prototype.map.call(arguments, function (map) {
-        for (var i in map) this[i] = map[i];
-    }, this);
+Obj_proto.merge  = function () {
+    Arr_proto.treemap.call(arguments, function (map) {this.extend(map)}, this);
 };

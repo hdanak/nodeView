@@ -4,6 +4,7 @@ var Graphic = Class({
     requires: [ "coldet" ],
     init: function ()
     {
+        var children = {};
     },
     methods: {
         draw: function (ctx, loc) {},
