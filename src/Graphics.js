@@ -1,3 +1,10 @@
+/* nodeView::src/Graphics.js
+ *
+ * Copyright 2013 Hike Danakian
+ * Released under the GNU Lesser GPL v.3
+ * See COPYING and COPYING.LESSER for license information.
+ *
+ */
 
 var Graphic = Class({
     mixins: [ Signals ],

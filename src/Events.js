@@ -1,3 +1,10 @@
+/* nodeView::src/Events.js
+ *
+ * Copyright 2013 Hike Danakian
+ * Released under the GNU Lesser GPL v.3
+ * See COPYING and COPYING.LESSER for license information.
+ *
+ */
 
 var EventListener = Class({
     requires: ["children"],
