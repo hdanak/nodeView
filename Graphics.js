@@ -1,17 +1,21 @@
 
 var Graphic = Class({
-    mixins: [ EventListener ],
-    proto: {
-        draw:   function (ctx, loc) {},
+    mixins: [ Signals ],
+    requires: [ "coldet" ],
+    init: function ()
+    {
+    },
+    methods: {
+        draw: function (ctx, loc) {},
     },
 });
 var BoundingBox = Class({
-    constructor: function (width, height)
+    init: function (width, height)
     {
         this.width  = ifndef(width,  0);
         this.height = ifndef(height, 0);
     },
-    proto: {
+    methods: {
         coldet: function (origin, target)
         {
             return ( origin.x + this.width  >= target.x
@@ -20,13 +24,12 @@ var BoundingBox = Class({
         },
     },
 });
-var Canvas2dDisplay = Class({
+var Canvas2dScene = Class({
     mixins: [ EventListener ],
-    constructor: function (
+    init: function (
         /* Canvas DOM Element */ canvas,
     ) {
         this._ctx = canvas.getContext("2d");
-        this._saved_states = [];
 
         function DOM_mouse_pos (
             /* DOM Event */ ev,
@@ -48,17 +51,12 @@ var Canvas2dDisplay = Class({
         convert_DOM_event( 'mouseenter', 'cursor.over' );
         convert_DOM_event( 'mouseleave', 'cursor.out'  );
     },
-    proto: {
-        push:   chain(function (fx)
+    methods: {
+        do:     chain(function (fx)
         {
-            this._saved_states.push(fx);
             this._ctx.save();
-        }),
-        pop:    chain(function ()
-        {
-            fx = this._saved_states.pop();
+            fx();
             this._ctx.restore();
-            if (fx) fx();
         }),
         path:   chain(function (fx)
         {

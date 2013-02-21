@@ -9,20 +9,20 @@
 var NodeView = {};
 var Node = Class({
     mixins: [ Graphic ],
-    constructor: function ()
+    init: function ()
     {
         this.corner_radius = 5;
         this.inputs = PinTray('input', this);
         this.outputs = PinTray('output', this);
         this.children = [ this.inputs, this.outputs ];
     },
-    proto: {
-        draw:   function (ctx, loc)
+    methods: {
+        draw:   function (scene, loc)
         {
             var width  = this.width,
                 height = this.height,
                 radius = this.corner_radius;
-            ctx.path(function () {
+            scene.path(function () {
                 this.move(loc.x + radius, loc.y)
                     .line(loc.x + width - radius, loc.y)
                     .quadratic(loc.x + width, loc.y,
@@ -41,11 +41,11 @@ var Node = Class({
 });
 /* I/O Pin Tray */
 var PinTray = Class({
-    constructor: function (type)
+    init: function (type)
     {
         this.type = type;
     },
-    proto: {
+    methods: {
         add:  chain(function ()
         {
             this.children.push(Pin(this.type))
@@ -55,26 +55,26 @@ var PinTray = Class({
 });
 /* Directional Wire */
 var Wire = Class({
-    mixins: [ Graphic ],
-    constructor: function (start, end)
+    mixins: [ Graphic, Signals ],
+    init: function (start, end)
     {
         Gfx();
         this.start = null;
         this.end   = null;
     },
-    proto: {
-        draw:   function (ctx, loc)
+    methods: {
+        draw:   function (scene, loc)
         {
-            if (!this.start || !this.end) {
+            if (!this.start || !this.end)
                 return;
-            } else if (this.start.x < this.end.x) {
-                ctx .push()
-                    .bezier(this.start, this.end, start.dir).stroke()
-                    .pop();
+            if (this.start.x < this.end.x) {
+                scene.do(function () {
+                    this.bezier(this.start, this.end, start.dir).stroke()
+                });
             } else {
-                ctx .push()
-                    .bezier(this.start, this.end, !start.dir).stroke()
-                    .pop();
+                scene.do(function () {
+                    this.bezier(this.start, this.end, !start.dir).stroke()
+                });
             }
         },
     },
@@ -82,32 +82,32 @@ var Wire = Class({
 /* Directional I/O Pin */
 var Pin = Class({
     mixins: [ Graphic ],
-    constructor: function (type, node) {
+    init: function (type, node) {
         this.radius = 3;
         this.dir = type ? 1 : 0;
         this.wire = null;
         this._bubble = false;
     },
-    proto: {
+    methods: {
         bubble: function (state) {
             this._bubble = state || !defined(state);
         }
-        draw:   function (ctx, loc)
+        draw:   function (scene, loc)
         {
             var self = this;
-            ctx.path(function () {
+            scene.path(function () {
                 var arc_start = Math.PI/2 * (self.dir ? 1 : -1);
                 this.arc( loc.x + (self.dir ? -1 : 1) * self._bubble, loc.y,
                           self.radius - self._bubble,
                           arc_start, -arc_start, false );
             });
             if (self._bubble) {
-                ctx.wrap(function () {
+                scene.do(function () {
                     this.style('line_width', 3)
                         .stroke()
                 });
             } else {
-                ctx.wrap(function () {
+                scene.do(function () {
                     this.style('line_width', 1)
                         .style('fill_color', '#eee')
                         .fill()

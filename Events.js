@@ -1,8 +1,7 @@
 
 var EventListener = Class({
-    constructor: function ()
-    {
-        this.children = ifndef(this.children, [])
+    requires: ["children"],
+    init: function () {
         this.event = {
             handlers: {},
             emit:   function (ev)
@@ -19,5 +18,5 @@ var EventListener = Class({
         this.event.default = this.event.delegate = function (ev) {
             this.children.map(function (c) { c.handle(ev); }, this);
         };
-    },
+    }
 });

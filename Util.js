@@ -16,29 +16,31 @@ function chain (fx, self)
         return self;
     };
 }
-function Class (def)
-{
-    var cons = def.constructor || function () {};
-// TODO: deduplicate mixins from ancestors
-    if (def.mixins) {
-        var cons_orig = cons;
-        cons = function () {
-            def.mixins.map(function (fx) { fx.call(this) }, this);
-            cons_orig.apply(this, arguments);
-        };
-    }
-    var protos = [].concat(
-        def.mixins ? def.mixins.map(function (x) { return x.prototype }) : [],
-        def.proto || []
-    ).reverse();
-    var proto = cons;
-    protos.forEach(function (elem) {
-        proto.prototype = Object.create(elem);
-        proto = proto.prototype;
+Array.prototype.treemap = function (callback, thisArg) {
+    return this.map(function (elem) {
+        return (elem instanceof Array) ? elem.treemap(callback, thisArg)
+                                       : callback.call(thisArg, elem);
     });
-    cons.prototype.constructor = cons;
-    if (def.post_proto) {
-        def.post_proto.call(cons.prototype);
-    }
-    return cons;
+}
+Array.prototype.merge   = function () {
+    Array.prototype.treemap.call(arguments, function (item) {
+        this.push(item)
+    }, this);
+    return this.length;
+};
+Array.prototype.extend  = function () {
+    Array.prototype.map.call(arguments, function (item) {
+        this.push(item)
+    }, this);
+    return this.length;
+};
+Object.prototype.merge  = function () {
+    Array.prototype.treemap.call(arguments, function (map) {
+        for (var i in map) this[i] = map[i];
+    }, this);
+};
+Object.prototype.extend = function () {
+    Array.prototype.map.call(arguments, function (map) {
+        for (var i in map) this[i] = map[i];
+    }, this);
 };
