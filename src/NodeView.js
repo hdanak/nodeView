@@ -1,4 +1,4 @@
-/* nodeView::src/NodeView.js
+/* nodeView :: src/NodeView.js
  *
  * Copyright 2013 Hike Danakian
  * Released under the GNU Lesser GPL v.3
@@ -17,12 +17,12 @@ var Node = Class({
         this.children = [ this.inputs, this.outputs ];
     },
     methods: {
-        draw:   function (scene, loc)
+        draw:   function (screen, loc)
         {
             var width  = this.width,
                 height = this.height,
                 radius = this.corner_radius;
-            scene.path(function () {
+            screen.path(function () {
                 this.move(loc.x + radius, loc.y)
                     .line(loc.x + width - radius, loc.y)
                     .quadratic(loc.x + width, loc.y,
@@ -58,21 +58,20 @@ var Wire = Class({
     mixins: [ Graphic, Signals ],
     init: function (start, end)
     {
-        Gfx();
-        this.start = null;
-        this.end   = null;
+        this.start = start;
+        this.end   = end;
     },
     methods: {
-        draw:   function (scene, loc)
+        draw:   function (screen, loc)
         {
             if (!this.start || !this.end)
                 return;
             if (this.start.x < this.end.x) {
-                scene.do(function () {
+                screen.do(function () {
                     this.bezier(this.start, this.end, start.dir).stroke()
                 });
             } else {
-                scene.do(function () {
+                screen.do(function () {
                     this.bezier(this.start, this.end, !start.dir).stroke()
                 });
             }
@@ -95,27 +94,27 @@ var Pin = Class({
                 old_val = this._bubble;
                 this._bubble = value;
                 if (old_val != val)
-                    this.signal.fire('bubble', val);
+                    this.signals.fire('bubble', val);
             }
         });
     },
     methods: {
-        draw:   function (scene, loc)
+        draw:   function (screen, loc)
         {
             var self = this;
-            scene.path(function () {
+            screen.path(function () {
                 var arc_start = Math.PI/2 * (self.dir ? 1 : -1);
                 this.arc( loc.x + (self.dir ? -1 : 1) * self._bubble, loc.y,
                           self.radius - self._bubble,
                           arc_start, -arc_start, false );
             });
             if (self._bubble) {
-                scene.do(function () {
+                screen.do(function () {
                     this.style('line_width', 3)
                         .stroke()
                 });
             } else {
-                scene.do(function () {
+                screen.do(function () {
                     this.style('line_width', 1)
                         .style('fill_color', '#eee')
                         .fill()
@@ -142,8 +141,7 @@ var Pin = Class({
 
         self.zone.move(self.x + (self._type == "i" ? -radius/2 - 5 : radius/2 - 3),
                        self.y - radius - 1);
-        self.zone.resize(dot_width + 4,
-                         radius * 2 + 2);
+        self.zone.resize(dot_width + 4, radius * 2 + 2);
     }
 function Scene () {
     var self = new Object();

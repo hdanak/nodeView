@@ -8,13 +8,16 @@
 
 var Graphic = Class({
     mixins: [ Signals ],
-    requires: [ "coldet" ],
+    requires: [ "coldet", "children" ],
     init: function ()
     {
         var children = {};
     },
     methods: {
-        draw: function (ctx, loc) {},
+        draw: function (screen, loc) {},
+        delegate: function (ev) {
+            this.children.map(function (c) { c.handle(ev); }, this);
+        },
     },
 });
 var BoundingBox = Class({
@@ -32,7 +35,7 @@ var BoundingBox = Class({
         },
     },
 });
-var Canvas2dScene = Class({
+var Canvas2dScreen = Class({
     mixins: [ EventListener ],
     init: function (
         /* Canvas DOM Element */ canvas,
