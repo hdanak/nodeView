@@ -17,24 +17,27 @@ var Node = Class({
         this.children = [ this.inputs, this.outputs ];
     },
     methods: {
-        draw:   function (screen, loc)
+        draw:   function (screen)
         {
-            var width  = this.width,
-                height = this.height,
-                radius = this.corner_radius;
+            var w = this.width,
+                h = this.height,
+                x = this.x,
+                y = this.y,
+                r = this.corner_radius;
             screen.path(function () {
-                this.move(loc.x + radius, loc.y)
-                    .line(loc.x + width - radius, loc.y)
-                    .quadratic(loc.x + width, loc.y,
-                               loc.x + width, loc.y + radius)
-                    .line(loc.x + width, loc.y + height - radius)
-                    .quadratic(loc.x + width, loc.y + height,
-                               loc.x + width - radius, loc.y + height)
-                    .line(loc.x + radius, loc.y + height)
-                    .quadratic(loc.x, loc.y + height,
-                               loc.x, loc.y + height - radius)
-                    .line(loc.x, loc.y + radius)
-                    .quadratic(loc.x, loc.y, loc.x + radius, loc.y)
+                this.move( x + r, y )
+                    .line( x + w - r, y )
+                    .quadratic( x + w, y,
+                                x + w, y + r )
+                    .line( x + w, y + h - r )
+                    .quadratic( x + w, y + h,
+                                x + w - r, y + h )
+                    .line( x + r, y + h )
+                    .quadratic( x, y + h,
+                                x, y + h - r )
+                    .line( x, y + r )
+                    .quadratic( x, y,
+                                x + r, y )
             }).stroke();
         },
     },
@@ -62,17 +65,20 @@ var Wire = Class({
         this.end   = end;
     },
     methods: {
-        draw:   function (screen, loc)
+        draw:   function (screen)
         {
-            if (!this.start || !this.end)
+            var start = this.start,
+                end   = this.end,
+                dir   = this.dir;
+            if (!start || !end)
                 return;
-            if (this.start.x < this.end.x) {
+            if (start.x < end.x) {
                 screen.do(function () {
-                    this.bezier(this.start, this.end, start.dir).stroke()
+                    this.bezier(start, end, dir).stroke()
                 });
             } else {
                 screen.do(function () {
-                    this.bezier(this.start, this.end, !start.dir).stroke()
+                    this.bezier(start, end, !start.dir).stroke()
                 });
             }
         },
@@ -99,12 +105,12 @@ var Pin = Class({
         });
     },
     methods: {
-        draw:   function (screen, loc)
+        draw:   function (screen)
         {
             var self = this;
             screen.path(function () {
                 var arc_start = Math.PI/2 * (self.dir ? 1 : -1);
-                this.arc( loc.x + (self.dir ? -1 : 1) * self._bubble, loc.y,
+                this.arc( self.x + (self.dir ? -1 : 1) * self._bubble, this.y,
                           self.radius - self._bubble,
                           arc_start, -arc_start, false );
             });

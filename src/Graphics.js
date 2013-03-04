@@ -8,59 +8,113 @@
 
 var Graphic = Class({
     mixins: [ Signals ],
-    requires: [ "coldet", "children" ],
-    init: function ()
+    requires: [ "coldet" ],
+    init: function (offset, parent)
     {
-        var children = {};
+        this.children = [];
+        this.parent = ifndef(parent, { x: 0, y: 0 });
+        this.offset = ifndef(offset, { x: 0, y: 0 });
+
+        function delegate_under(type) {
+            function (cursor) {
+                this.children
+                    .filter(function (x) { x.coldet(cursor) })
+                    .map(function (x) { x.fire('cursor.down', cursor) });
+            }
+        }
+        this.signals.connect('cursor.down', delegate_under('cursor.down'));
+        this.signals.connect('cursor.up',   delegate_under('cursor.up'));
+        this.signals.connect('cursor.move', delegate_under('cursor.move'));
+        this.signals.connect('cursor.over', function () { });
+        this.signals.connect('cursor.out',  function () { });
     },
     methods: {
-        draw: function (screen, loc) {},
-        delegate: function (ev) {
-            this.children.map(function (c) { c.handle(ev); }, this);
+        get x () {
+            return this.bound ? this.bound.target.x + this.bound.offset.x
+                              : this.parent.x + this.offset.x ;
         },
+        get y () {
+            return this.bound ? this.bound.target.y + this.bound.offset.y
+                              : this.parent.y + this.offset.y
+        },
+        bind: function (target, offset) {
+            this.bound = { target: target,
+                           offset: ifndef(offset, { x: 0, y: 0 }) };
+        },
+        unbind: function () {
+            this.bound = undefined;
+        },
+        draw: function (screen) {},
     },
 });
 var BoundingBox = Class({
+    requires: [ "x", "y" ],
     init: function (width, height)
     {
         this.width  = ifndef(width,  0);
         this.height = ifndef(height, 0);
     },
     methods: {
-        coldet: function (origin, target)
+        coldet: function (target)
         {
-            return ( origin.x + this.width  >= target.x
-                  && origin.y + this.height >= target.y
-                  && origin.x <= target.x && origin.y <= target.y );
+            return ( this.x + this.width  >= target.x
+                  && this.y + this.height >= target.y
+                  && this.x <= target.x && this.y <= target.y );
         },
     },
+    tests: {
+        coldet_01: function () {
+            var bounds = BoundingBox(100, 200);
+            bounds.x = 0;
+            bounds.y = 0;
+            this.ok(bounds.coldet(0, 0));
+            this.ok(bounds.coldet(100, 0));
+            this.ok(bounds.coldet(0, 200));
+            this.ok(bounds.coldet(100, 200));
+            this.ok(bounds.coldet(50, 100));
+        }
+    }
+});
+var Cursor2d = Class({
+    init: function (screen) {
+        this.parent = screen
+        this.x = 0;
+        this.y = 0;
+    },
+    methods: {
+        function handleEvent(ev)
+        {
+            if (defined(ev.layerX)) {   // Firefox
+                this.x = ev.layerX;
+                this.y = ev.layerY;
+            }
+            if (defined(ev.offsetX)) {  // Opera
+                this.x = ev.offsetX;
+                this.y = ev.offsetY;
+            }
+            switch (ev.type) {
+                case 'mousedown':
+                    this.parent.signals.fire('cursor.down', this);
+                    break;
+                case 'mouseup':
+                    this.parent.signals.fire('cursor.down', this);
+                    break;
+                case 'mouseenter':
+                    break;
+                case 'mouseleave':
+                    break;
+            }
+        }
+    }
 });
 var Canvas2dScreen = Class({
-    mixins: [ EventListener ],
-    init: function (
-        /* Canvas DOM Element */ canvas,
-    ) {
+    init: function (canvas)
+    {
         this._ctx = canvas.getContext("2d");
 
-        function DOM_mouse_pos (
-            /* DOM Event */ ev,
-        ) {
-            if (defined(ev.layerX))     // Firefox
-                return { x: ev.layerX,  y: ev.layerY  };
-            if (defined(ev.offsetX))    // Opera
-                return { x: ev.offsetX, y: ev.offsetY };
-            return { x: undefined,  y: undefined  }
-        }
-        function convert_DOM_event (DOM_type, nodeView_type) {
-            var self = this;
-            canvas.addEventListener('mousedown', function (ev) {
-                self.handle({ type: nodeView_type, loc: DOM_mouse_pos(ev) });
-            });
-        }
-        convert_DOM_event( 'mouseup',    'cursor.up'   );
-        convert_DOM_event( 'mousedown',  'cursor.down' );
-        convert_DOM_event( 'mouseenter', 'cursor.over' );
-        convert_DOM_event( 'mouseleave', 'cursor.out'  );
+        this.cursor = new Cursor(this);
+        for (ev_type in [ 'mousedown', 'mouseup', 'mouseenter', 'mouseleave' ])
+            canvas.addEventListener(ev_type, this.cursor);
     },
     methods: {
         do:     chain(function (fx)

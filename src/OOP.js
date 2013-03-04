@@ -9,10 +9,15 @@
 function Class (def)
 {
     var cons = function () {
-        // check required
+        // check 'required'
         cons._meta.mixins.map(function (fx) { fx.call(this) }, this);
         cons._meta.init.apply(this, arguments);
     };
+    /*
+     * TODO: Ensure that 'this' object is correctly blessed, to allow things
+     * like MyClass.apply({ ... }, ... ). Or at least provide a 'bless'
+     * function to easily add a prototype chain to an existing object.
+     */
     if (def instanceof Function)
         def = { init: def };
     cons._meta = {

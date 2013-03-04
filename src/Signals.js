@@ -9,35 +9,39 @@
 var Signals = Class({
     init: function ()
     {
-        this.signals = { slots: {}, blocked: {} };
-        this.signals.default = function () {};
+        this.signals = { slots: {}, masked: {} };
         this.signals.self = this;
     },
     methods: {
         signals: {
-            fire:       function (type, data, self)
+            fire:       function (name)
             {
-                if (!this.blocked[type])
-                    ifndef(this.slots[type], [this.default]).map(
-                           function (fx) { fx.call(self, this, data) }, this.self);
+                var args = Array.prototype.slice.call(arguments, 1);
+                if (this.masked[name])
+                    this.masked[name].apply(this.self, args);
+                else if (this.slots[name])
+                    this.slots[name].map(function (fx) {
+                        fx.apply(this, args)
+                    }, this.self);
             },
-            slot:       function (type, data, self)
+            slot:       function (name)
             {
-                var signals = this;
-                return function () { signals.fire(type, data, self) }
+                var args    = arguments,
+                    signals = this;
+                return function () { signals.fire.apply(signals, args) }
             },
-            connect:    function (type, fx)
+            connect:    function (name, fx)
             {
-                this.slots[type] = ifndef(this.slots[type], []);
-                this.slots[type].push(fx);
+                this.slots[name] = ifndef(this.slots[name], []);
+                this.slots[name].push(fx);
             },
-            block:      function (type)
+            mask:      function (name, fx)
             {
-                this.blocked[type] = true;
+                this.masked[name] = fx;
             },
-            unblock:    function (type)
+            unmask:    function (name)
             {
-                this.blocked[type] = false;
+                this.masked[name] = undefined;
             }
         }
     }
