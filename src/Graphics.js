@@ -106,31 +106,55 @@ NodeView.Cursor2d       = NodeView.Class({
 NodeView.Canvas2dSurface = NodeView.Class({
     init: function (canvas)
     {
+        this._pen_down = 0;
         this._ctx = canvas.getContext("2d");
         this.cursor = new Cursor2d(this);
     },
     methods: {
-        do:     chain(function (fx)
+        push:   function ()
+        {
+        },
+        pop:    function ()
+        {
+        },
+        repeat: function ()
+        {
+        },
+        do:     function (fx)
         {
             this._ctx.save();
             fx();
             this._ctx.restore();
-        }),
-        path:   chain(function (fx)
+        },
+
+        path:   function (p)
         {
-            this._ctx.beginPath();
-            fx();
-            this._ctx.closePath();
-        }),
-        stroke: chain(function ()
+            var path;
+            if (p instanceof Function) {
+                path = p.call(new Plotter.Path());
+            } else if (p instanceof Plotter.Path) {
+                path = p;
+            }
+            path.render(this);
+        },
+        spline: function (spline)
         {
-            this._ctx.stroke();
-        }),
-        move:   chain(function (point)
+        },
+
+        relative:   function ()
+        {
+        },
+        absolute:   function ()
+        {
+        },
+        move:   function ()
         {
             this._ctx.move(point.x, point.y);
-        }),
-        bezier: chain(function (start, end, reverse)
+        },
+        arc:    function ()
+        {
+        },
+        bezier: function (start, end, reverse)
         {
 
             if (!reverse && start.x > end.x) {
@@ -150,6 +174,19 @@ NodeView.Canvas2dSurface = NodeView.Class({
             }
             this.move(start);
             this._ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, end.x, end.y);
-        }),
-    }
+        },
+
+        down:   function ()
+        {
+            this._pen_down = 0;
+        },
+        up:     function ()
+        {
+            this._pen_down = 0;
+        },
+        draw:   function ()
+        {
+            this._ctx.stroke();
+        },
+    }.map(chain)
 });
