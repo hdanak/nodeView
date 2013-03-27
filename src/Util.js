@@ -28,7 +28,7 @@ Obj_proto = Object.prototype;
 Arr_proto.treemap = function (callback, thisArg) {
     return this.map(function (elem) {
         return (elem instanceof Array) ? elem.treemap(callback, thisArg)
-                                       : thisArg ? callback.call(thisArg, elem);
+                                       : thisArg ? callback.call(thisArg, elem)
                                                  : callback(elem) });
 };
 Arr_proto.extend  = function () {

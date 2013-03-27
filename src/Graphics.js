@@ -6,8 +6,8 @@
  *
  */
 
-var Graphic = Class({
-    mixins: [ Signals ],
+NodeView.Graphic        = NodeView.Class({
+    mixins: [ NodeView.Signals ],
     requires: [ "coldet" ],
     init: function (offset, parent)
     {
@@ -15,18 +15,13 @@ var Graphic = Class({
         this.parent = ifndef(parent, { x: 0, y: 0 });
         this.offset = ifndef(offset, { x: 0, y: 0 });
 
-        function delegate_under(type) {
-            function (cursor) {
-                this.children
-                    .filter(function (x) { x.coldet(cursor) })
-                    .map(function (x) { x.fire('cursor.down', cursor) });
-            }
-        }
-        this.signals.connect('cursor.down', delegate_under('cursor.down'));
-        this.signals.connect('cursor.up',   delegate_under('cursor.up'));
-        this.signals.connect('cursor.move', delegate_under('cursor.move'));
-        this.signals.connect('cursor.over', function () { });
-        this.signals.connect('cursor.out',  function () { });
+        this.signals.delegate = function () {
+            this.children.filter(function (x) { x.coldet(cursor) })
+                         .map(function (x) { x.fire(type, cursor) });
+        };
+        cursor.signals.connect('down', this.signals.slot('delegate', 'cursor.down'));
+        cursor.signals.connect('up',   delegate_under('cursor.up'));
+        cursor.signals.connect('move', delegate_under('cursor.move'));
     },
     methods: {
         get x () {
@@ -47,7 +42,7 @@ var Graphic = Class({
         draw: function (screen) {},
     },
 });
-var BoundingBox = Class({
+NodeView.BoundingBox    = NodeView.Class({
     requires: [ "x", "y" ],
     init: function (width, height)
     {
@@ -75,14 +70,16 @@ var BoundingBox = Class({
         }
     }
 });
-var Cursor2d = Class({
-    init: function (screen) {
-        this.parent = screen
+NodeView.Cursor2d       = NodeView.Class({
+    init: function (elem) {
+        this.elem = elem;
+        for (name in [ 'mousedown', 'mouseup', 'mousemove' ])
+            this.elem.addEventListener(name, this);
         this.x = 0;
         this.y = 0;
     },
     methods: {
-        function handleEvent(ev)
+        handleEvent: function(ev)
         {
             if (defined(ev.layerX)) {   // Firefox
                 this.x = ev.layerX;
@@ -94,27 +91,23 @@ var Cursor2d = Class({
             }
             switch (ev.type) {
                 case 'mousedown':
-                    this.parent.signals.fire('cursor.down', this);
+                    this.parent.signals.fire('down');
                     break;
                 case 'mouseup':
-                    this.parent.signals.fire('cursor.down', this);
+                    this.parent.signals.fire('up');
                     break;
-                case 'mouseenter':
-                    break;
-                case 'mouseleave':
+                case 'mousemove':
+                    this.parent.signals.fire('move');
                     break;
             }
         }
     }
 });
-var Canvas2dScreen = Class({
+NodeView.Canvas2dSurface = NodeView.Class({
     init: function (canvas)
     {
         this._ctx = canvas.getContext("2d");
-
-        this.cursor = new Cursor(this);
-        for (ev_type in [ 'mousedown', 'mouseup', 'mouseenter', 'mouseleave' ])
-            canvas.addEventListener(ev_type, this.cursor);
+        this.cursor = new Cursor2d(this);
     },
     methods: {
         do:     chain(function (fx)
@@ -155,8 +148,8 @@ var Canvas2dScreen = Class({
                 cp1x += width;
                 cp2x -= width;
             }
-            this.move(start)
-                ._ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, end.x, end.y);
+            this.move(start);
+            this._ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, end.x, end.y);
         }),
     }
 });

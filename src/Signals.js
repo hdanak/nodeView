@@ -6,14 +6,12 @@
  *
  */
 
-var Signals = Class({
+NodeView.Signals = NodeView.Class({
     init: function ()
     {
-        this.signals = { slots: {}, masked: {} };
-        this.signals.self = this;
-    },
-    methods: {
-        signals: {
+        this.signals = {
+            slots: {},
+            self: this,
             fire:       function (name)
             {
                 var args = Array.prototype.slice.call(arguments, 1);
@@ -35,6 +33,11 @@ var Signals = Class({
                 this.slots[name] = ifndef(this.slots[name], []);
                 this.slots[name].push(fx);
             },
+            delegate: function () {
+                this.children.filter(function (x) { x.coldet(cursor) })
+                             .map(function (x) { x.fire(type, cursor) });
+            },
+            masked: {},
             mask:      function (name, fx)
             {
                 this.masked[name] = fx;
@@ -42,7 +45,9 @@ var Signals = Class({
             unmask:    function (name)
             {
                 this.masked[name] = undefined;
-            }
-        }
+            },
+        };
+    },
+    methods: {
     }
 });

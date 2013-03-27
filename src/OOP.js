@@ -6,7 +6,7 @@
  *
  */
 
-function Class (def)
+NodeView.Class = function (def)
 {
     var cons = function () {
         // check 'required'
@@ -21,7 +21,7 @@ function Class (def)
     if (def instanceof Function)
         def = { init: def };
     cons._meta = {
-        init:       def.init || function () {};
+        init:       def.init || function () {},
         methods:    {},
         mixins:     [], requires:   [],
         after:      {}, before:     {}, around:     {},
@@ -30,60 +30,61 @@ function Class (def)
     // Mutator methods for setting properties after creation
     cons.methods  = chain(function ()
     {
-        this._meta.methods.merge(arguments);
-    });
+        cons._meta.methods.merge(arguments);
+    }, cons);
     cons.mixins   = chain(function (list)
     {   
-        this._meta.mixins.merge(arguments);
-        var protos = this._meta.mixins.map(function (x) { return x.prototype })
+        cons._meta.mixins.merge(arguments);
+        console.log(cons._meta);
+        var protos = cons._meta.mixins.map(function (x) { return x.prototype })
                                       .reverse();
-        var proto  = this.prototype;
+        var proto  = cons.prototype;
         protos.forEach(function (mp) {
             proto.prototype = Object.create(mp);
             proto = proto.prototype;
         });
         //  TODO: resolve duplicate mixins from ancestors
-    });
+    }, cons);
     cons.requires = chain(function ()
     {
-        this._meta.required.merge(arguments);
-    });
+        cons._meta.required.merge(arguments);
+    }, cons);
     cons.after    = chain(function (map)
     {
-        this._meta.after.merge(map)
+        cons._meta.after.merge(map)
         for (var i in map) {
             var after = map[i];
-            var method = this[i];
-            this[i] = function () {
-                var retval = method.apply(this, arguments);
-                return ifndef(after.apply(this, [].concat(arguments, retval)),
+            var method = cons[i];
+            cons[i] = function () {
+                var retval = method.apply(cons, arguments);
+                return ifndef(after.apply(cons, [].concat(arguments, retval)),
                               retval);
             };
         }
-    });
+    }, cons);
     cons.before   = chain(function (map)
     {
-        this._meta.before.merge(map)
+        cons._meta.before.merge(map)
         for (var i in map) {
             var before = map[i];
-            var method = this[i];
-            this[i] = function () {
-                before.call(this, arguments);
-                return method.apply(this, arguments);
+            var method = cons[i];
+            cons[i] = function () {
+                before.call(cons, arguments);
+                return method.apply(cons, arguments);
             };
         }
-    });
+    }, cons);
     cons.around   = chain(function (map)
     {
-        this._meta.around.merge(map)
+        cons._meta.around.merge(map)
         for (var i in map) {
             var around = map[i];
-            var method = this[i];
-            this[i] = function () {
-                return around.apply(this, [].concat(method, arguments))
+            var method = cons[i];
+            cons[i] = function () {
+                return around.apply(cons, [].concat(method, arguments))
             };
         }
-    });
+    }, cons);
     cons.prototype = Object.create(cons._meta.methods);
     cons.prototype.constructor = cons;
     cons.methods  ( def.methods  || {} ).mixins ( def.mixins || [] )
