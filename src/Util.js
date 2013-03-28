@@ -48,7 +48,16 @@ Obj_proto.map    = function (callback, thisArg) {
 }
 Obj_proto.extend = function () {
     Arr_proto.map.call(arguments, function (map) {
-        for (var k in map) this[k] = map[k];
+        for (var k in map) {
+            var getter = map.__lookupGetter__(k),
+                setter = map.__lookupSetter__(k);
+            if (getter)
+                this.__defineGetter__(k, getter);
+            else if (setter)
+                this.__defineSetter__(k, setter);
+            else
+                this[k] = map[k];
+        }
     }, this);
 };
 Obj_proto.merge  = function () {
