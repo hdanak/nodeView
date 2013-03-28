@@ -6,187 +6,125 @@
  *
  */
 
-NodeView.Graphic        = NodeView.Class({
-    mixins: [ NodeView.Signals ],
-    requires: [ "coldet" ],
-    init: function (offset, parent)
-    {
-        this.children = [];
-        this.parent = ifndef(parent, { x: 0, y: 0 });
-        this.offset = ifndef(offset, { x: 0, y: 0 });
+NodeView.Graphics = {
+    Widget: NodeView.Class({
+        init: function (parent)
+        {
+            this.children = [];
+            this.offset = { x: 0, y: 0 }
+            this.parent = parent;
+            if (parent) parent.addChild(this);
+        },
+        methods: {
+            coldet: function (target) {},
+            under:  function (target) {
+                if (this.coldet(target))
+                    return this;
+                return this.children.first(function (c) {
+                    return c.under(target)
+                })
+            },
+            draw:   function (surface) {},
+            render: function (surface) {
+                this.draw(surface);
+                this.children.map(function (c) { c.render(surface) });
+            },
 
-        this.signals.delegate = function () {
-            this.children.filter(function (x) { x.coldet(cursor) })
-                         .map(function (x) { x.fire(type, cursor) });
-        };
-        cursor.signals.connect('down', this.signals.slot('delegate', 'cursor.down'));
-        cursor.signals.connect('up',   delegate_under('cursor.up'));
-        cursor.signals.connect('move', delegate_under('cursor.move'));
-    },
-    methods: {
-        get x () {
-            return this.bound ? this.bound.target.x + this.bound.offset.x
-                              : this.parent.x + this.offset.x ;
-        },
-        get y () {
-            return this.bound ? this.bound.target.y + this.bound.offset.y
-                              : this.parent.y + this.offset.y
-        },
-        bind: function (target, offset) {
-            this.bound = { target: target,
-                           offset: ifndef(offset, { x: 0, y: 0 }) };
-        },
-        unbind: function () {
-            this.bound = undefined;
-        },
-        draw: function (screen) {},
-    },
-});
-NodeView.BoundingBox    = NodeView.Class({
-    requires: [ "x", "y" ],
-    init: function (width, height)
-    {
-        this.width  = ifndef(width,  0);
-        this.height = ifndef(height, 0);
-    },
-    methods: {
-        coldet: function (target)
-        {
-            return ( this.x + this.width  >= target.x
-                  && this.y + this.height >= target.y
-                  && this.x <= target.x && this.y <= target.y );
-        },
-    },
-    tests: {
-        coldet_01: function () {
-            var bounds = BoundingBox(100, 200);
-            bounds.x = 0;
-            bounds.y = 0;
-            this.ok(bounds.coldet(0, 0));
-            this.ok(bounds.coldet(100, 0));
-            this.ok(bounds.coldet(0, 200));
-            this.ok(bounds.coldet(100, 200));
-            this.ok(bounds.coldet(50, 100));
-        }
-    }
-});
-NodeView.Cursor2d       = NodeView.Class({
-    init: function (elem) {
-        this.elem = elem;
-        for (name in [ 'mousedown', 'mouseup', 'mousemove' ])
-            this.elem.addEventListener(name, this);
-        this.x = 0;
-        this.y = 0;
-    },
-    methods: {
-        handleEvent: function(ev)
-        {
-            if (defined(ev.layerX)) {   // Firefox
-                this.x = ev.layerX;
-                this.y = ev.layerY;
-            }
-            if (defined(ev.offsetX)) {  // Opera
-                this.x = ev.offsetX;
-                this.y = ev.offsetY;
-            }
-            switch (ev.type) {
-                case 'mousedown':
-                    this.parent.signals.fire('down');
-                    break;
-                case 'mouseup':
-                    this.parent.signals.fire('up');
-                    break;
-                case 'mousemove':
-                    this.parent.signals.fire('move');
-                    break;
+            reparent: function (p) {
+                if (this.parent)
+                    this.parent.removeChild(this);
+                p.addChild(this);
+            },
+            addChild: function (c) {
+                this.children.push(c);
+                c.parent = this;
+            },
+            removeChild: function (c) {
+                for (var i = 0; i < this.children.length; ++i)
+                    if (this.children[i] === c)
+                        this.children.splice(i, 1);
+            },
+
+            x: function (n) {
+                var p = ifndef(this.parent, { x: 0 });
+                if (defined(n)) {
+                    this.offset.x = n - p.x;
+                    return this;
+                }
+                return p.x + this.offset.x;
+            },
+            y: function (n) {
+                var p = ifndef(this.parent, { y: 0 });
+                if (defined(n)) {
+                    this.offset.y = n - p.y;
+                    return this;
+                }
             }
         }
-    }
-});
-NodeView.Canvas2dSurface = NodeView.Class({
-    init: function (canvas)
-    {
-        this._pen_down = 0;
-        this._ctx = canvas.getContext("2d");
-        this.cursor = new Cursor2d(this);
-    },
-    methods: {
-        push:   function ()
+    }),
+    Rectangle:   NodeView.Class({
+        mixins: [ NodeView.Graphics.Widget ],
+        init: function (width, height, parent)
         {
+            NodeView.Graphics.Widget.call(this, parent);
+            this.width  = ifndef(width,  0);
+            this.height = ifndef(height, 0);
         },
-        pop:    function ()
-        {
-        },
-        repeat: function ()
-        {
-        },
-        do:     function (fx)
-        {
-            this._ctx.save();
-            fx();
-            this._ctx.restore();
-        },
-
-        path:   function (p)
-        {
-            var path;
-            if (p instanceof Function) {
-                path = p.call(new Plotter.Path());
-            } else if (p instanceof Plotter.Path) {
-                path = p;
+        methods: {
+            coldet: function (target)
+            {
+                return ( this.x + this.width  >= target.x
+                      && this.y + this.height >= target.y
+                      && this.x <= target.x && this.y <= target.y );
             }
-            path.render(this);
-        },
-        spline: function (spline)
+        }
+    }),
+    Circle:   NodeView.Class({
+        mixins: [ NodeView.Graphics.Widget ],
+        init: function (radius, parent)
         {
+            NodeView.Graphics.Widget.call(this, parent);
+            this.radius = ifndef(radius, 0);
         },
-
-        relative:   function ()
-        {
-        },
-        absolute:   function ()
-        {
-        },
-        move:   function ()
-        {
-            this._ctx.move(point.x, point.y);
-        },
-        arc:    function ()
-        {
-        },
-        bezier: function (start, end, reverse)
-        {
-
-            if (!reverse && start.x > end.x) {
-                var tmp = start; start = end; end = tmp;
+        methods: {
+            coldet: function (target)
+            {
+                return ( Math.pow(this.x - target.x, 2)
+                       + Math.pow(this.y - target.y, 2)) < Math.pow(this.radius, 2)
             }
-            var cp1x = start.x, cp1y = start.y,
-                cp2x = end.x,   cp2y = end.y;
-            if (reverse) {
-                var height = Math.abs(end.y - start.y)/3;
-                var dir = end.y > start.y ? 1 : -1;
-                cp1y += height * dir;
-                cp2y -= height * dir;
-            } else {
-                var width = Math.abs(end.x - start.x)/3;
-                cp1x += width;
-                cp2x -= width;
+        }
+    }),
+    Cursor: NodeView.Class({
+        mixins: [ NodeView.Graphics.Widget ],
+        init: function (dom_elem, parent) {
+            NodeView.Graphics.Widget.call(this, parent);
+            this.element = dom_elem;
+            for (name in [ 'mousedown', 'mouseup', 'mousemove' ])
+                this.elem.addEventListener(name, this);
+        },
+        methods: {
+            handleEvent: function(ev)
+            {
+                if (defined(ev.layerX)) {   // Firefox
+                    this.x = ev.layerX;
+                    this.y = ev.layerY;
+                }
+                if (defined(ev.offsetX)) {  // Opera
+                    this.x = ev.offsetX;
+                    this.y = ev.offsetY;
+                }
+                switch (ev.type) {
+                    case 'mousedown':
+                        this.parent.signals.fire('down');
+                        break;
+                    case 'mouseup':
+                        this.parent.signals.fire('up');
+                        break;
+                    case 'mousemove':
+                        this.parent.signals.fire('move');
+                        break;
+                }
             }
-            this.move(start);
-            this._ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, end.x, end.y);
-        },
-
-        down:   function ()
-        {
-            this._pen_down = 0;
-        },
-        up:     function ()
-        {
-            this._pen_down = 0;
-        },
-        draw:   function ()
-        {
-            this._ctx.stroke();
-        },
-    }.map(chain)
-});
+        }
+    })
+};
