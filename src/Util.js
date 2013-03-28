@@ -63,3 +63,9 @@ Obj_proto.extend = function () {
 Obj_proto.merge  = function () {
     Arr_proto.treemap.call(arguments, function (map) {this.extend(map)}, this);
 };
+Arr_proto.first  = function (callback, thisObject) {
+    for (var i = 0; i < this.length; ++i) {
+        if (callback.call(thisObject, this[i]))
+            return this[i];
+    }
+}
