@@ -90,5 +90,43 @@ NodeView.Class = function (def)
     cons.methods  ( def.methods  || {} ).mixins ( def.mixins || [] )
         .requires ( def.requires || [] ).after  ( def.after  || {} )
         .before   ( def.before   || {} ).around ( def.around || {} );
+    cons.signals = {
+        slots: {},
+        self: this,
+        fire:       function (name)
+        {
+            var args = Array.prototype.slice.call(arguments, 1);
+            if (this.masked[name])
+                this.masked[name].apply(this.self, args);
+            else if (this.slots[name])
+                this.slots[name].map(function (fx) {
+                    fx.apply(this, args)
+                }, this.self);
+        },
+        slot:       function (name)
+        {
+            var args    = arguments,
+                signals = this;
+            return function () { signals.fire.apply(signals, args) }
+        },
+        connect:    function (name, fx)
+        {
+            this.slots[name] = ifndef(this.slots[name], []);
+            this.slots[name].push(fx);
+        },
+        delegate: function () {
+            this.children.filter(function (x) { x.coldet(cursor) })
+                         .map(function (x) { x.fire(type, cursor) });
+        },
+        masked: {},
+        mask:      function (name, fx)
+        {
+            this.masked[name] = fx;
+        },
+        unmask:    function (name)
+        {
+            this.masked[name] = undefined;
+        },
+    };
     return cons;
 };
