@@ -6,75 +6,72 @@
  *
  */
 
-NodeView.Graphics = {
+NodeView.Graphics = {}
 
-Widget:
-    function (parent)
+NodeView.Graphics.Widget = function (parent)
+{
+    this.x(0); this.y(0);
+    this.parent = parent;
+    this.children = [];
+    this.offset = { x: 0, y: 0 }
+    if (parent) parent.addChild(this);
+}
+NodeView.Graphics.Widget.prototype = {
+    function x(n) {
+        var p = ifndef(this.parent, { x: 0 });
+        return defined(n) ? this.offset.x = n - p.x
+                          : this.offset.x + p.x;
+    },
+    function y(n) {
+        var p = ifndef(this.parent, { y: 0 });
+        return defined(n) ? this.offset.y = n - p.y
+                          : this.offset.y + p.y;
+    },
+    function draw (surface) {},
+    function render(surface)
     {
-        this.x(0); this.y(0);
-        this.parent = parent;
-        this.children = [];
-        this.offset = { x: 0, y: 0 }
-        if (parent) parent.addChild(this);
-    }.meta.Class.slots(
-        function x(n) {
-            var p = ifndef(this.parent, { x: 0 });
-            return defined(n) ? this.offset.x = n - p.x
-                              : this.offset.x + p.x;
-        },
-        function y(n) {
-            var p = ifndef(this.parent, { y: 0 });
-            return defined(n) ? this.offset.y = n - p.y
-                              : this.offset.y + p.y;
-        },
-    ).methods(
-        function draw (surface) {},
-        function render(surface)
-        {
-            this.draw(surface);
-            this.children.map(function (c) { c.render(surface) });
-        },
-        function coldet(target) {},
-        function under(target)
-        {
-            if (this.coldet(target))
-                return this;
-            return this.children.first(function (c) { return c.under(target) })
-        },
-        function reparent(p)
-        {
-            if (this.parent)
-                this.parent.removeChild(this);
-            p.addChild(this);
-        },
-        function addChild(c)
-        {
-            this.children.push(c);
-            c.parent = this;
-        },
-        function removeChild(c)
-        {
-            for (var i = 0; i < this.children.length; ++i)
-                if (this.children[i] === c)
-                    this.children.splice(i, 1);
-        }
-    ),
-Rectangle:
-    function (width, height, parent)
+        this.draw(surface);
+        this.children.map(function (c) { c.render(surface) });
+    },
+    function coldet(target) {},
+    function under(target)
     {
-        NodeView.Graphics.Widget.call(this, parent);
-        this.width  = ifndef(width,  0);
-        this.height = ifndef(height, 0);
-    }.metaClass().bases(
-        NodeView.Graphics.Widget
-    ).methods(
-        function coldet(target)
-        {
-            return ( this.x + this.width  >= target.x
-                  && this.y + this.height >= target.y
-                  && this.x <= target.x && this.y <= target.y );
-        }
-    ),
+        if (this.coldet(target))
+            return this;
+        return this.children.first(function (c) { return c.under(target) })
+    },
+    function reparent(p)
+    {
+        if (this.parent)
+            this.parent.removeChild(this);
+        p.addChild(this);
+    },
+    function addChild(c)
+    {
+        this.children.push(c);
+        c.parent = this;
+    },
+    function removeChild(c)
+    {
+        for (var i = 0; i < this.children.length; ++i)
+            if (this.children[i] === c)
+                this.children.splice(i, 1);
+    }
+};
+NodeView.Graphics.Rectangle = function (width, height, parent)
+{
+    NodeView.Graphics.Widget.call(this, parent);
+    this.width  = ifndef(width,  0);
+    this.height = ifndef(height, 0);
+};
+NodeView.Graphics.Rectangle.prototype = {
+    coldet: function(target)
+    {
+        return ( this.x + this.width  >= target.x
+              && this.y + this.height >= target.y
+              && this.x <= target.x && this.y <= target.y );
+    }
+};
 Circle:
     function (radius, parent)
     {
