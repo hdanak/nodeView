@@ -179,10 +179,9 @@ function Scene(canvas) {
     nodes: [],
     edges: [],
 
-    _mode: 'NONE',
     _selected: null,
 
-    canvas: canvas,
+    canvas: canvas, $canvas: $(canvas),
     context: canvas.getContext("2d"),
   })
   this.context.translate(0.5, 0.5)
@@ -191,104 +190,114 @@ function Scene(canvas) {
     , _offset = new Point(0,0)
     , _target = null
 
-  this.canvas.addEventListener('mousedown', function(ev) {
-    switch (this._mode) {
-    case 'DRAG':
-      this._mode = 'NONE'
-      this._selected = null
-      break
-    case 'DELETE':
-      var elem = this.find_zone(_cursor.x, _cursor.y)
-      if (elem instanceof Node) {
-        this.remove_node(elem)
-        this.draw()
-      }
-      this.canvas.style.cursor = "auto"
-      this._mode = 'NONE'
-      break
-    case 'BUBBLE':
-      this._mode = 'CONNECT'
-      var elem = this.find_zone(_cursor.x, _cursor.y)
-      if (elem instanceof Connector && elem.edge != null) {
-        this._selected = elem.type == 'i' ? elem.edge.start : elem.edge.end
-        elem.edge.disconnect()
-        _target = null
-      }
-      break
-    case 'CONNECT':
-      break
-    default:
-      var elem = this.find_zone(_cursor.x, _cursor.y)
-      if (elem instanceof Node) {
-        this._mode = 'DRAG'
-        this._selected = elem
-        _offset = new Point(_cursor.x - elem.x, _cursor.y - elem.y)
+  this.$canvas.on('mousedown', function(ev) {
+      switch (this.mode) {
+      case 'DRAG':
+        this.mode = 'NONE'
+        this._selected = null
         break
-      }
-    }
-  }.bind(this), false)
-  this.canvas.addEventListener('mouseup', function (ev) {
-    switch (this._mode) {
-    case 'CONNECT':
-      if (_target != null) {
-        this._selected.connect(_target)
-
-        _target.bubble = false
-        _target = null
-      }
-      this._selected.bubble = false
-      this._selected = null
-      this._mode = 'NONE'
-      break
-    case 'BUBBLE':
-      break
-    default:
-      this._mode = 'NONE'
-      this._selected = null
-    }
-  }.bind(this), false)
-  this.canvas.addEventListener('mousemove', function (ev) {
-    _cursor = get_mouse_cursor(ev)
-    switch (this._mode) {
-    case 'DRAG':
-      this._selected.move(_cursor.x - _offset.x, _cursor.y - _offset.y)
-      this.draw()
-      break
-    case 'CONNECT':
-      var elem = this.find_zone(_cursor.x, _cursor.y)
-      if (elem instanceof Connector && elem.type != this._selected.type) {
-        if (_target != null && _target != elem) {
-          _target.bubble = false
+      case 'DELETE':
+        var elem = this.find_zone(_cursor.x, _cursor.y)
+        if (elem instanceof Node) {
+          this.remove_node(elem)
+          this.draw()
         }
-        elem.bubble = true
-        _target = elem
-      } else if (_target != null) {
-        _target.bubble = false
-        _target = null
+        this.mode = 'NONE'
+        this.$canvas.removeClass('delete-mode')
+        break
+      case 'BUBBLE':
+        this.mode = 'CONNECT'
+        var elem = this.find_zone(_cursor.x, _cursor.y)
+        if (elem instanceof Connector && elem.edge != null) {
+          this._selected = elem.type == 'i' ? elem.edge.start : elem.edge.end
+          elem.edge.disconnect()
+          _target = null
+        }
+        break
+      case 'CONNECT':
+        break
+      default:
+        var elem = this.find_zone(_cursor.x, _cursor.y)
+        if (elem instanceof Node) {
+          this.mode = 'DRAG'
+          this._selected = elem
+          _offset = new Point(_cursor.x - elem.x, _cursor.y - elem.y)
+          break
+        }
       }
+      return false
+    }.bind(this)).on('mouseup', function (ev) {
+      switch (this.mode) {
+      case 'CONNECT':
+        if (_target != null) {
+          this._selected.connect(_target)
 
-      this.draw()
-      draw_nice_bezier(this._selected, _cursor, this.context,
-          this._selected.type == (this._selected.x < _cursor.x ? 'i' : 'o'))
-      break
-    case 'BUBBLE':
-      if (this._selected != this.find_zone(_cursor.x, _cursor.y)) {
+          _target.bubble = false
+          _target = null
+        }
         this._selected.bubble = false
         this._selected = null
-        this._mode = 'NONE'
+        this.mode = 'NONE'
+        break
+      case 'BUBBLE':
+        break
+      default:
+        this.mode = 'NONE'
+        this._selected = null
       }
-      break
-    default:
-      var elem = this.find_zone(_cursor.x, _cursor.y)
-      if (elem instanceof Connector) {
-        elem.bubble = true
-        this._selected = elem
-        this._mode = 'BUBBLE'
+      return false
+    }.bind(this)).on('mousemove', function (ev) {
+      _cursor = get_mouse_cursor(ev)
+      switch (this.mode) {
+      case 'DRAG':
+        this._selected.move(_cursor.x - _offset.x, _cursor.y - _offset.y)
+        this.draw()
+        break
+      case 'CONNECT':
+        var elem = this.find_zone(_cursor.x, _cursor.y)
+        if (elem instanceof Connector && elem.type != this._selected.type) {
+          if (_target != null && _target != elem) {
+            _target.bubble = false
+          }
+          elem.bubble = true
+          _target = elem
+        } else if (_target != null) {
+          _target.bubble = false
+          _target = null
+        }
+
+        this.draw()
+        draw_nice_bezier(this._selected, _cursor, this.context,
+            this._selected.type == (this._selected.x < _cursor.x ? 'i' : 'o'))
+        break
+      case 'BUBBLE':
+        if (this._selected != this.find_zone(_cursor.x, _cursor.y)) {
+          this._selected.bubble = false
+          this._selected = null
+          this.mode = 'NONE'
+        }
+        break
+      default:
+        var elem = this.find_zone(_cursor.x, _cursor.y)
+        if (elem instanceof Connector) {
+          elem.bubble = true
+          this._selected = elem
+          this.mode = 'BUBBLE'
+        }
       }
-    }
-  }.bind(this), false)
+      return false
+    }.bind(this))
 }
+Scene.modes = Enum('NONE', 'DRAG', 'CONNECT', 'BUBBLE', 'DELETE')
 mixin(Scene.prototype, {
+  get mode(m) { return this._mode || 'NONE' },
+  set mode(m) {
+    if (m in Scene.modes) {
+      this._mode = m
+    } else {
+      throw('Invalid Scene mode: ' + m)
+    }
+  },
   add_edge: chain(function(edge) {
     edges.push(edge)
   }),
@@ -303,7 +312,7 @@ mixin(Scene.prototype, {
 
     if (interactive) {
       this._selected = node
-      this._mode = 'DRAG'
+      this.mode = 'DRAG'
       node.draw()
     }
   }),
@@ -318,8 +327,8 @@ mixin(Scene.prototype, {
     }
 
     if (interactive) {
-      this._mode = 'DELETE'
-      this.canvas.style.cursor = "crosshair"
+      this.mode = 'DELETE'
+      this.$canvas.addClass('delete-mode')
     }
   }),
   draw: function() {
@@ -355,6 +364,11 @@ function chain(fx) {
     fx.apply(this, arguments)
     return this
   }
+}
+function Enum() {
+  var o = {}
+  Array.prototype.forEach.call(arguments, function(l, i) { o[l] = i })
+  return o
 }
 
 function get_mouse_cursor(ev) {

@@ -23,6 +23,9 @@
         border-bottom: 1px solid #646464;
         border-right: 1px solid #646464;
       }
+      #canvas.delete-mode {
+        cursor: crosshair;
+      }
       #panel {
         float: left;
         clear: none;
@@ -55,7 +58,7 @@
     </div>
     <canvas id="canvas" width="500" height="480"></canvas>
 
-    <script type="application/javascript" src="jquery-1.5.2.min.js"></script>
+    <script type="application/javascript" src="jquery-2.0.3.min.js"></script>
     <script type="application/javascript" src="nodeView.js"></script>
     <script type="application/javascript">
       $(function() {
