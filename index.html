@@ -47,35 +47,34 @@
         background-color: #494949;
       }
     </style>
-    <script type="application/javascript" src="jquery-1.5.2.min.js"></script>
-    <script type="application/javascript" src="nodeView.js"></script>
-    <script type="application/javascript">
-      var scene;
-      var canvas;
-      function new_node () {
-          scene.add_node_interactive(
-              Node(0, 0, 100, 50)
-                .add_input()
-                .add_input()
-                .add_input()
-                .add_output()
-	        );
-      }
-      $('#canvas').ready(function () {
-          canvas = $('#canvas')[0];
-          scene = Scene(canvas);
-          scene.context.fillStyle = "white";
-          scene.context.strokeStyle = "white";
-          scene.draw();
-      });
-    </script>
   </head>
   <body>
     <div id="panel">
       <button type="button" onclick="new_node()" title="Add node"><img src="add.png"/></button>
-      <button type="button" onclick="scene.remove_node_interactive()" title="Remove node"><img src="remove.png"/></button>
+      <button type="button" onclick="remove_node()" title="Remove node"><img src="remove.png"/></button>
     </div>
     <canvas id="canvas" width="500" height="480"></canvas>
+
+    <script type="application/javascript" src="jquery-1.5.2.min.js"></script>
+    <script type="application/javascript" src="nodeView.js"></script>
+    <script type="application/javascript">
+      $(function() {
+        scene = new Scene($('#canvas')[0])
+        scene.context.fillStyle = "white"
+        scene.context.strokeStyle = "white"
+        scene.draw()
+
+        new_node = function() {
+          scene.add_node(
+            new Node(0, 0, 100, 50).add_input().add_input().add_input().add_output(),
+            true
+          )
+        }
+        remove_node = function() {
+          scene.remove_node(null, true)
+        }
+      })
+    </script>
   </body>
 </html>
 
