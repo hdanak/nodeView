@@ -8,7 +8,7 @@
 
 // Utility functions
 function defined(q) { return q != undefined }
-function ifndef(q, t, f) { return !defined(q) ? t : f }
+function ifndef(q, x) { return defined(q) ? q : x }
 Object.prototype.setdefault = function (x, d) {
     this[x] = ifndef(this[x], d);
     return this[x]
