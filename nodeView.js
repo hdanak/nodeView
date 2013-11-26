@@ -33,14 +33,15 @@ inherits(Rect, Point, {
 
 function Circle(x, y, r) {
   Point.call(this, x, y)
-  this.r = r
+  this.tolerance = 0
+  this.resize(r)
 }
 inherits(Circle, Point, {
   resize: function(r) {
     this.r = r
   },
   coldet: function (x, y) {
-    var r_squared = Math.pow(this.r, 2)
+    var r_squared = Math.pow(this.r + this.tolerance, 2)
     return Math.pow(x - this.x, 2) <= r_squared
         && Math.pow(y - this.y, 2) <= r_squared
   }
@@ -72,6 +73,7 @@ function Connector(type, node) {
     node: node,
     edge: null,
     _bubble: false,
+    tolerance: 3
   })
   this.port = this.type == 'i' ? node.inputs : node.outputs
 }
@@ -97,7 +99,7 @@ inherits(Connector, Circle, {
 
     ctx.beginPath()
     ctx.arc(this.x + (this.type == 'i' ? -1 : 1) * this.bubble, this.y,
-            this.r - this.bubble, arc_start, -arc_start, false)
+            this.r - 0.75 * this.bubble, arc_start, -arc_start, false)
     ctx.closePath()
 
     ctx.save()
