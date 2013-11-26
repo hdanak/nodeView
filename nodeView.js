@@ -24,6 +24,10 @@ inherits(Rect, Point, {
   resize: function(w, h) {
     this.w = w
     this.h = h
+  },
+  coldet: function (x, y) {
+    return (this.x + this.w >= x && this.x <= x
+         && this.y + this.h >= y && this.y <= y)
   }
 })
 
@@ -31,16 +35,14 @@ function Circle(x, y, r) {
   Point.call(this, x, y)
   this.r = r
 }
-inherits(Circle, Point)
-
-function Zone(x, y, w, h, par) {
-  Rect.call(this, x, y, w, h)
-  this.parent = par
-}
-inherits(Zone, Rect, {
+inherits(Circle, Point, {
+  resize: function(r) {
+    this.r = r
+  },
   coldet: function (x, y) {
-    return (this.x + this.w >= x && this.x <= x
-         && this.y + this.h >= y && this.y <= y)
+    var r_squared = Math.pow(this.r, 2)
+    return Math.pow(x - this.x, 2) <= r_squared
+        && Math.pow(y - this.y, 2) <= r_squared
   }
 })
 
@@ -62,12 +64,11 @@ mixin(Edge.prototype, {
 })
 
 function Connector(type, node) {
-  Circle.call(this, node.zone.x, node.zone.y, 3)
+  Circle.call(this, node.x, node.y, 3)
   mixin(this, {
     type: type.toLowerCase().charAt(0),
     node: node,
     edge: null,
-    zone: new Zone(this.x, this.y, 0, 0, this),
     _bubble: false,
   })
   this.port = this.type == 'i' ? node.inputs : node.outputs
@@ -89,7 +90,6 @@ inherits(Connector, Circle, {
     this.scene.add_edge(this.edge)
   },
   draw: function() {
-    this.update()
     var ctx = this.scene.context
       , arc_start = Math.PI/2 * (this.type == 'i' ? 1 : -1)
 
@@ -109,16 +109,10 @@ inherits(Connector, Circle, {
     ctx.stroke()
     ctx.restore()
   },
-  update: function() {
-    var dot_width = this._radius + 2 * this.scene.context.lineWidth
-    this.x = this.node.x + (this.type == 'i' ? 0 : this.node.w)
-    this.y = this.node.y + this.node.corner_radius
-              + (this.node.h - this.node.corner_radius * 2) * this.number/(this.port.length + 1)
-
-    this.zone.move(this.x + (this.type == "i" ? -this.r/2 - 5 : this.r/2 - 3),
-                   this.y - this.r - 1)
-    this.zone.resize(dot_width + 4, 2 * this.r + 2)
-  }
+  get x() { return this.node.x + (this.type == 'i' ? 0 : this.node.w) },
+  get y() { return this.node.y + this.node.corner_radius
+                    + (this.node.h - this.node.corner_radius * 2)
+                        * this.number/(this.port.length + 1) }
 })
 
 function Input(node) {
@@ -135,7 +129,6 @@ function Node(x, y, w, h, scene) {
   Rect.call(this, x, y, w, h)
   mixin(this, {
     corner_radius: 5,
-    zone: new Zone(x, y, w, h, this),
     inputs: [], outputs: [],
     scene: scene
   })
@@ -150,14 +143,11 @@ inherits(Node, Rect, {
   find_zone: function(x, y) {
     var res = null
     this.inputs.concat(this.outputs).some(function(elem) {
-      if (elem.zone.coldet(x, y)) {
-        res = elem.zone
+      if (res = elem.coldet(x, y)) {
         return true
       }
     })
-    if (!res && this.zone.coldet(x, y)) {
-      res = this.zone
-    }
+    res = res || this.coldet(x, y) && this
     return res
   },
   draw: function() {
@@ -181,13 +171,7 @@ inherits(Node, Rect, {
 
     this.inputs.map(function(x){x.draw()})
     this.outputs.map(function(x){x.draw()})
-  },
-  move: chain(function(x, y) {
-    Point.prototype.move.call(this, x, y)
-    this.zone.move(x, y)
-    this.inputs.map(function(x) {x.update()})
-    this.outputs.map(function(x) {x.update()})
-  })
+  }
 })
 
 function Scene(canvas) {
@@ -214,9 +198,9 @@ function Scene(canvas) {
       this._selected = null
       break
     case 'DELETE':
-      var zone = this.find_zone(_cursor.x, _cursor.y)
-      if (zone != null && zone.parent instanceof Node) {
-        this.remove_node(zone.parent)
+      var elem = this.find_zone(_cursor.x, _cursor.y)
+      if (elem instanceof Node) {
+        this.remove_node(elem)
         this.draw()
       }
       this.canvas.style.cursor = "auto"
@@ -224,23 +208,21 @@ function Scene(canvas) {
       break
     case 'BUBBLE':
       this._mode = 'CONNECT'
-      var zone = this.find_zone(_cursor.x, _cursor.y)
-      if (zone && zone.parent.edge != null) {
-        this._selected = zone.parent.type == 'i' ? zone.parent.edge.start
-                                                 : zone.parent.edge.end
-        zone.parent.edge.disconnect()
+      var elem = this.find_zone(_cursor.x, _cursor.y)
+      if (elem instanceof Connector && elem.edge != null) {
+        this._selected = elem.type == 'i' ? elem.edge.start : elem.edge.end
+        elem.edge.disconnect()
         _target = null
       }
       break
     case 'CONNECT':
       break
     default:
-      var zone = this.find_zone(_cursor.x, _cursor.y)
-      if (zone && zone.parent instanceof Node) {
+      var elem = this.find_zone(_cursor.x, _cursor.y)
+      if (elem instanceof Node) {
         this._mode = 'DRAG'
-        this._selected = zone.parent
-        _offset = new Point(_cursor.x - zone.parent.x,
-                            _cursor.y - zone.parent.y)
+        this._selected = elem
+        _offset = new Point(_cursor.x - elem.x, _cursor.y - elem.y)
         break
       }
     }
@@ -273,13 +255,13 @@ function Scene(canvas) {
       this.draw()
       break
     case 'CONNECT':
-      var zone = this.find_zone(_cursor.x, _cursor.y)
-      if (zone && zone.parent instanceof Connector && zone.parent.type != this._selected.type) {
-        if (_target != null && _target != zone.parent) {
+      var elem = this.find_zone(_cursor.x, _cursor.y)
+      if (elem instanceof Connector && elem.type != this._selected.type) {
+        if (_target != null && _target != elem) {
           _target.bubble = false
         }
-        zone.parent.bubble = true
-        _target = zone.parent
+        elem.bubble = true
+        _target = elem
       } else if (_target != null) {
         _target.bubble = false
         _target = null
@@ -290,17 +272,17 @@ function Scene(canvas) {
           this._selected.type == (this._selected.x < _cursor.x ? 'i' : 'o'))
       break
     case 'BUBBLE':
-      if (this._selected.zone != this.find_zone(_cursor.x, _cursor.y)) {
+      if (this._selected != this.find_zone(_cursor.x, _cursor.y)) {
         this._selected.bubble = false
         this._selected = null
         this._mode = 'NONE'
       }
       break
     default:
-      var zone = this.find_zone(_cursor.x, _cursor.y)
-      if (zone && zone.parent instanceof Connector) {
-        zone.parent.bubble = true
-        this._selected = zone.parent
+      var elem = this.find_zone(_cursor.x, _cursor.y)
+      if (elem instanceof Connector) {
+        elem.bubble = true
+        this._selected = elem
         this._mode = 'BUBBLE'
       }
     }
@@ -346,10 +328,8 @@ mixin(Scene.prototype, {
   },
   find_zone: function(x, y) {
     var res = null
-      , zone = null
     this.nodes.some(function(elem) {
-      if (zone = elem.find_zone(x, y)) {
-        res = zone
+      if (res = elem.find_zone(x, y)) {
         return true
       }
     })
