@@ -52,6 +52,8 @@ function Edge(start, end, reverse) {
 }
 mixin(Edge.prototype, {
   draw: function () {
+    var start = this.start
+      , end   = this.end
     if (!start || !end)
       return
     draw_nice_bezier(start, end, start.scene.context,
@@ -143,7 +145,8 @@ inherits(Node, Rect, {
   find_zone: function(x, y) {
     var res = null
     this.inputs.concat(this.outputs).some(function(elem) {
-      if (res = elem.coldet(x, y)) {
+      if (elem.coldet(x, y)) {
+        res = elem
         return true
       }
     })
@@ -299,7 +302,7 @@ mixin(Scene.prototype, {
     }
   },
   add_edge: chain(function(edge) {
-    edges.push(edge)
+    this.edges.push(edge)
   }),
   remove_edge: chain(function(edge) {
     var pos = this.edges.indexOf(edge)
