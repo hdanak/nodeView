@@ -129,12 +129,12 @@ function Output(node) {
 }
 inherits(Output, Connector)
 
-function Node(x, y, w, h, scene) {
+function Node(x, y, w, h) {
   Rect.call(this, x, y, w, h)
   mixin(this, {
     corner_radius: 5,
     inputs: [], outputs: [],
-    scene: scene
+    scene: null
   })
 }
 inherits(Node, Rect, {
