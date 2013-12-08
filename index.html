@@ -68,13 +68,13 @@
         scene.draw()
 
         new_node = function() {
-          scene.add_node(
-            new Node(0, 0, 100, 50).add_input().add_input().add_input().add_output(),
+          scene.addNode(
+            new Node(0, 0, 100, 50).addInput().addInput().addInput().addOutput(),
             true
           )
         }
         remove_node = function() {
-          scene.remove_node(null, true)
+          scene.removeNode(null, true)
         }
       })
     </script>

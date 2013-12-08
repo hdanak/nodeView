@@ -61,7 +61,7 @@ mixin(Edge.prototype, {
                      start.type == (start.x < end.x ? 'i' : 'o'))
   },
   disconnect: function () {
-    this.start.scene.remove_edge(this)
+    this.start.scene.removeEdge(this)
     this.start.edge = this.end.edge = this.start = this.end = null
   }
 })
@@ -91,7 +91,7 @@ inherits(Connector, Circle, {
   },
   connect: function(target) {
     this.edge = new Edge(target, this, this.type != 'i')
-    this.scene.add_edge(this.edge)
+    this.scene.addEdge(this.edge)
   },
   draw: function() {
     var ctx = this.scene.context
@@ -138,13 +138,13 @@ function Node(x, y, w, h, scene) {
   })
 }
 inherits(Node, Rect, {
-  add_input: chain(function() {
+  addInput: chain(function() {
     this.inputs.push(new Input(this))
   }),
-  add_output: chain(function() {
+  addOutput: chain(function() {
     this.outputs.push(new Output(this))
   }),
-  find_zone: function(x, y) {
+  findZone: function(x, y) {
     var res = null
     this.inputs.concat(this.outputs).some(function(elem) {
       if (elem.coldet(x, y)) {
@@ -202,7 +202,7 @@ function Scene(canvas) {
         this._selected = null
         break
       case 'DELETE':
-        var elem = this.find_zone(_cursor.x, _cursor.y)
+        var elem = this.findZone(_cursor.x, _cursor.y)
         if (elem instanceof Node) {
           this.remove_node(elem)
           this.draw()
@@ -212,7 +212,7 @@ function Scene(canvas) {
         break
       case 'BUBBLE':
         this.mode = 'CONNECT'
-        var elem = this.find_zone(_cursor.x, _cursor.y)
+        var elem = this.findZone(_cursor.x, _cursor.y)
         if (elem instanceof Connector && elem.edge != null) {
           this._selected = elem.type == 'i' ? elem.edge.start : elem.edge.end
           elem.edge.disconnect()
@@ -222,7 +222,7 @@ function Scene(canvas) {
       case 'CONNECT':
         break
       default:
-        var elem = this.find_zone(_cursor.x, _cursor.y)
+        var elem = this.findZone(_cursor.x, _cursor.y)
         if (elem instanceof Node) {
           this.mode = 'DRAG'
           this._selected = elem
@@ -259,7 +259,7 @@ function Scene(canvas) {
         this.draw()
         break
       case 'CONNECT':
-        var elem = this.find_zone(_cursor.x, _cursor.y)
+        var elem = this.findZone(_cursor.x, _cursor.y)
         if (elem instanceof Connector && elem.type != this._selected.type) {
           if (_target != null && _target != elem) {
             _target.bubble = false
@@ -276,14 +276,14 @@ function Scene(canvas) {
             this._selected.type == (this._selected.x < _cursor.x ? 'i' : 'o'))
         break
       case 'BUBBLE':
-        if (this._selected != this.find_zone(_cursor.x, _cursor.y)) {
+        if (this._selected != this.findZone(_cursor.x, _cursor.y)) {
           this._selected.bubble = false
           this._selected = null
           this.mode = 'NONE'
         }
         break
       default:
-        var elem = this.find_zone(_cursor.x, _cursor.y)
+        var elem = this.findZone(_cursor.x, _cursor.y)
         if (elem instanceof Connector) {
           elem.bubble = true
           this._selected = elem
@@ -303,25 +303,25 @@ mixin(Scene.prototype, {
       throw('Invalid Scene mode: ' + m)
     }
   },
-  add_edge: chain(function(edge) {
+  addEdge: chain(function(edge) {
     this.edges.push(edge)
   }),
-  remove_edge: chain(function(edge) {
+  removeEdge: chain(function(edge) {
     var pos = this.edges.indexOf(edge)
     if (pos >= 0)
       this.edges.splice(pos, 1)
   }),
-  add_node: chain(function(node, interactive) {
-    node.scene = this
+  addNode: chain(function(node, interactive) {
     this.nodes.push(node)
+    node.scene = this
+    node.draw()
 
     if (interactive) {
       this._selected = node
       this.mode = 'DRAG'
-      node.draw()
     }
   }),
-  remove_node: chain(function(node, interactive) {
+  removeNode: chain(function(node, interactive) {
     var pos = this.nodes.indexOf(node)
     if (pos >= 0) {
       node.inputs.concat(node.outputs).forEach(function(elem) {
@@ -340,10 +340,10 @@ mixin(Scene.prototype, {
     this.context.clearRect(0,0, this.canvas.width, this.canvas.height)
     this.nodes.concat(this.edges).forEach(function(elem) {elem.draw()})
   },
-  find_zone: function(x, y) {
+  findZone: function(x, y) {
     var res = null
     this.nodes.some(function(elem) {
-      if (res = elem.find_zone(x, y)) {
+      if (res = elem.findZone(x, y)) {
         return true
       }
     })
