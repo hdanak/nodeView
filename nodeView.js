@@ -111,8 +111,8 @@ inherits(Pin, Circle, {
   get number() {
     return this.port.indexOf(this) + 1
   },
-  connect: function(target) {
-    var edge = new Edge(target, this, this.type != 'i')
+  connect: function(target, edge) {
+    edge = edge || new Edge(target, this, this.type != 'i')
     this.edges.push(edge)
     this.scene.addEdge(edge)
   },
@@ -224,34 +224,32 @@ inherits(Node, Rect, {
   }
 })
 
-function Cursor(scene) {
-  Point.call(this, 0, 0)
-  mixin(this,
-  { scene: scene
-  , _mode: 'NONE'
-  })
+function Modal(eventSrc, eventCallback) {
+  this._mode = "NORMAL"
 
-  $(scene.canvas).on('mouseup mousedown mousemove', function(ev) {
-    this.updateFromEvent(ev)
-    var handler = Cursor.modes[this._mode].events[ev.type]
-    if (handler)
-      handler.call(this)
+  var eventTypes = {}
+  Object.keys(this.modes).map(function(m) {
+    if (this.modes[m].events)
+      Object.keys(this.modes[m].events).map(function(t) { eventTypes[t] = true })
+  }, this)
+
+  eventSrc.on(Object.keys(eventTypes).join(' '), function(ev) {
+    var handler = this.modes[this._mode].events[ev.type]
+    if (handler) {
+      handler.call(this, eventCallback.call(this, ev))
+    }
     return false
   }.bind(this))
 }
-inherits(Cursor, Point, {
-  updateFromEvent: chain(function(ev) {
-    if (ev.layerX || ev.layerX == 0) { // Firefox
-      this.move(ev.layerX, ev.layerY)
-    } else if (ev.offsetX || ev.offsetX == 0) { // Opera
-      this.move(ev.offsetX, ev.offsetY)
-    }
-  }),
+mixin(Modal.prototype, {
+  modes: {
+    NORMAL: {}
+  },
   mode: function(m) {
     if (arguments.length == 0)
       return this._mode
 
-    var modes = Cursor.modes
+    var modes = this.modes
       , args  = Array.prototype.slice.call(arguments, 1)
     if (!(m in modes))
       throw('Invalid mode: ' + m)
@@ -261,138 +259,152 @@ inherits(Cursor, Point, {
     modes[this._mode].enter && modes[this._mode].enter.apply(this, args)
   },
 })
-Cursor.modes = {
-  NONE: {
-    enter: function() {
-      this.scene.draw()
-    },
-    events: {
-      mousemove: function() {
-        var elem = this.scene.findZone(this.x, this.y)
-        if (elem instanceof Pin)
-          this.mode('BUBBLE', elem)
-      },
-      mousedown: function() {
-        var elem = this.scene.findZone(this.x, this.y)
-        if (elem instanceof Node)
-          this.mode('DRAG', elem)
-      },
-    }
-  },
-  DRAG: {
-    enter: function(elem, offset) {
-      this._dragging = elem
-      this._offset = offset || new Point(this.x - elem.x, this.y - elem.y)
-    },
-    exit: function(elem, offset) {
-      this._dragging = this._offset = null
-    },
-    events: {
-      mouseup: function() {
-        this.mode('NONE')
-      },
-      mousemove: function() {
-        this._dragging.move(this.x - this._offset.x,
-                            this.y - this._offset.y)
-        this.scene.draw()
-      },
-    }
-  },
-  BUBBLE: {
-    enter: function(elem) {
-      this._bubbled = elem
-      this._bubbled.bubble = true
-    },
-    exit: function(elem) {
-      this._bubbled.bubble = false
-      this._bubbled = null
-    },
-    events: {
-      mousemove: function() {
-        if (this._bubbled != this.scene.findZone(this.x, this.y)) {
-          this.mode('NONE')
-        }
-      },
-      mousedown: function() {
-        this.mode('CONNECT', this._bubbled)
-        var elem = this.scene.findZone(this.x, this.y)
-        if (elem instanceof Pin && elem.edges.length > 0) {
-          elem.disconnect()
-        }
-      },
-    }
-  },
-  CONNECT: {
-    enter: function(start) {
-      this._startPin = start
-      this._endPin = null
-      this._connector = new Edge(this._startPin, this)
-      this.scene.addEdge(this._connector)
-    },
-    exit: function() {
-      this.scene.removeEdge(this._connector)
-      if (this._startPin)
-        this._startPin.bubble = false
-      if (this._endPin)
-        this._endPin.bubble = false
-      this._connector = this._startPin = this._endPin = null
-    },
-    events: {
-      mouseup: function() {
-        if (this._endPin != null) {
-          this._startPin.connect(this._endPin)
-        }
-        this.mode('NONE')
-      },
-      mousemove: function() {
-        var elem = this.scene.findZone(this.x, this.y)
-        if (elem instanceof Pin && elem.type != this._startPin.type) {
-          if (this._endPin && this._endPin != elem) {
-            this._endPin.bubble = false
-          }
-          elem.bubble = true
-          this._endPin = elem
-        } else if (this._endPin) {
-          this._endPin.bubble = false
-          this._endPin = null
-        }
 
-        this.scene.draw()
-      },
-    }
-  },
-  DELETE: {
-    enter: function() {
-      $(this.scene.canvas).addClass('delete-mode')
-    },
-    exit: function() {
-      $(this.scene.canvas).removeClass('delete-mode')
-    },
-    events: {
-      mousedown: function() {
-        var elem = this.scene.findZone(this.x, this.y)
-        if (elem instanceof Node) {
-          this.scene.removeNode(elem)
-        }
-        this.mode('NONE')
-      },
-    }
-  },
+function Cursor() {
+  Point.call(this, 0, 0)
 }
+inherits(Cursor, Point, {
+  updateFromEvent: chain(function(ev) {
+    if (ev.layerX || ev.layerX == 0) { // Firefox
+      this.move(ev.layerX, ev.layerY)
+    } else if (ev.offsetX || ev.offsetX == 0) { // Opera
+      this.move(ev.offsetX, ev.offsetY)
+    }
+  }),
+})
 
 function Scene(canvas) {
   mixin(this,
   { nodes: []
   , edges: []
 
+  , cursor: new Cursor()
   , canvas: canvas
   , context: canvas.getContext("2d")
   })
-  this.cursor = new Cursor(this)
   this.context.translate(0.5, 0.5)
-}
 
-mixin(Scene.prototype, {
+  Modal.call(this, $(canvas), function(ev) {
+    this.cursor.updateFromEvent(ev)
+    return this.findZone(this.cursor.x, this.cursor.y)
+  }.bind(this))
+}
+inherits(Scene, Modal, {
+  modes: {
+    NORMAL: {
+      enter: function() {
+        this.draw()
+      },
+      events: {
+        mousemove: function(elem) {
+          if (elem instanceof Pin)
+            this.mode('BUBBLE', elem)
+        },
+        mousedown: function(elem) {
+          if (elem instanceof Node)
+            this.mode('DRAG', elem)
+        },
+      }
+    },
+    DRAG: {
+      enter: function(elem, offset) {
+        this._dragging = elem
+        this._offset = offset || new Point(this.cursor.x - elem.x, this.cursor.y - elem.y)
+      },
+      exit: function(elem, offset) {
+        this._dragging = this._offset = null
+      },
+      events: {
+        mouseup: function() {
+          this.mode('NORMAL')
+        },
+        mousemove: function() {
+          this._dragging.move(this.cursor.x - this._offset.x,
+                              this.cursor.y - this._offset.y)
+          this.draw()
+        },
+      }
+    },
+    BUBBLE: {
+      enter: function(elem) {
+        this._bubbled = elem
+        this._bubbled.bubble = true
+      },
+      exit: function(elem) {
+        this._bubbled.bubble = false
+        this._bubbled = null
+      },
+      events: {
+        mousemove: function(elem) {
+          if (this._bubbled != elem)
+            this.mode('NORMAL')
+        },
+        mousedown: function(elem) {
+          this.mode('CONNECT', this._bubbled)
+          if (elem instanceof Pin && elem.edges.length > 0) {
+            this._startPin.disconnect()
+          }
+        },
+      }
+    },
+    CONNECT: {
+      enter: function(start) {
+        this._startPin = start
+        this._endPin = null
+        this._connector = new Edge(this._startPin, this.cursor)
+        this.addEdge(this._connector)
+      },
+      exit: function() {
+        this.removeEdge(this._connector)
+        if (this._startPin)
+          this._startPin.bubble = false
+        if (this._endPin)
+          this._endPin.bubble = false
+        this._connector = this._startPin = this._endPin = null
+      },
+      events: {
+        mouseup: function() {
+          if (this._endPin != null) {
+            this._connector.end = this._endPin
+            this._startPin.connect(this._endPin, this._connector)
+          } else {
+            this.removeEdge(this._connector)
+          }
+          this.mode('NORMAL')
+        },
+        mousemove: function(elem) {
+          if (elem instanceof Pin && elem.type != this._startPin.type) {
+            if (this._endPin && this._endPin != elem) {
+              this._endPin.bubble = false
+            }
+            this._endPin = elem
+            this._endPin.bubble = true
+          } else if (this._endPin) {
+            this._endPin.bubble = false
+            this._endPin = null
+          }
+
+          this.draw()
+        },
+      }
+    },
+    DELETE: {
+      enter: function() {
+        $(this.canvas).addClass('delete-mode')
+      },
+      exit: function() {
+        $(this.canvas).removeClass('delete-mode')
+      },
+      events: {
+        mousedown: function(elem) {
+          if (elem instanceof Node) {
+            this.removeNode(elem)
+          }
+          this.mode('NORMAL')
+        },
+      }
+    },
+  },
   addEdge: chain(function(edge) {
     this.edges.push(edge)
   }),
@@ -406,7 +418,7 @@ mixin(Scene.prototype, {
     node.scene = this
 
     if (interactive) {
-      this.cursor.mode('DRAG', node, new Point(0, 0))
+      this.mode('DRAG', node, new Point(0, 0))
     } else {
       node.draw()
     }
@@ -422,9 +434,9 @@ mixin(Scene.prototype, {
     }
 
     if (interactive) {
-      this.cursor.mode('DELETE')
+      this.mode('DELETE')
     } else {
-      this.scene.draw()
+      this.draw()
     }
   }),
   draw: function() {
@@ -442,11 +454,13 @@ mixin(Scene.prototype, {
 
 // Utility functions
 
-function inherits(a, b, p) {
+function inherits(a, b) {
   a.prototype = Object.create(b.prototype)
+  if (arguments.length > 2) {
+    var protos = Array.prototype.slice.call(arguments, 2)
+    protos.map(function(p) { mixin(a.prototype, p) })
+  }
   a.prototype.constructor = a
-  if (p)
-    mixin(a.prototype, p)
 }
 function mixin(a, b) {
   Object.keys(b).forEach(function(k) {
