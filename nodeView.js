@@ -48,17 +48,43 @@ inherits(Circle, Point, {
 })
 
 function Edge(start, end, reverse) {
-  this.start = reverse ? end : start
-  this.end   = reverse ? start : end
+  mixin(this, { start: reverse ? end : start
+              , end:   reverse ? start : end })
 }
 mixin(Edge.prototype, {
   draw: function () {
-    var start = this.start
-      , end   = this.end
-    if (!start || !end)
+    if (!this.start || !this.end)
       return
-    draw_nice_bezier(start, end, start.scene.context,
-                     start.type == (start.x < end.x ? 'i' : 'o'))
+
+    var s = this.start
+      , e = this.end
+      , dist = { x: Math.abs(e.x - s.x)
+               , y: Math.abs(e.y - s.y) }
+      , ctx = this.start.scene.context
+      , reverse = (s.type == (s.x < e.x ? 'i' : 'o'))
+
+    ctx.save()
+
+    if (!reverse && s.x > e.x) {
+      var tmp = s
+      s = e
+      e = tmp
+    }
+
+    ctx.moveTo(s.x, s.y)
+
+    if (reverse) {
+      var dir = (e.y > s.y ? 1 : -1)
+      ctx.bezierCurveTo(s.x, s.y + dist.x/3 * dir,
+                        e.x, e.y - dist.y/3 * dir,
+                        e.x, e.y)
+    } else {
+      ctx.bezierCurveTo(s.x + dist.x/3, s.y,
+                        e.x - dist.x/3, e.y,
+                        e.x, e.y)
+    }
+    ctx.stroke()
+    ctx.restore()
   },
   disconnect: function () {
     this.start.scene.removeEdge(this)
@@ -66,18 +92,18 @@ mixin(Edge.prototype, {
   }
 })
 
-function Connector(type, node) {
+function Pin(node, type) {
   Circle.call(this, node.x, node.y, 3)
-  mixin(this, {
-    type: type.toLowerCase().charAt(0),
-    node: node,
-    edge: null,
-    _bubble: false,
-    tolerance: 3
+  mixin(this,
+  { type: type
+  , node: node
+  , edge: null
+  , _bubble: false
+  , tolerance: 3
   })
   this.port = this.type == 'i' ? node.inputs : node.outputs
 }
-inherits(Connector, Circle, {
+inherits(Pin, Circle, {
   get scene() { return this.node.scene },
   get bubble() { return this._bubble },
   set bubble(state) {
@@ -118,31 +144,30 @@ inherits(Connector, Circle, {
                     + (this.node.h - this.node.corner_radius * 2)
                         * this.number/(this.port.length + 1) }
 })
-
-function Input(node) {
-  Connector.call(this, 'input', node)
+function InputPin(node) {
+  Pin.call(this, node, 'i')
 }
-inherits(Input, Connector)
+inherits(InputPin, Pin)
 
-function Output(node) {
-  Connector.call(this, 'output', node)
+function OutputPin(node) {
+  Pin.call(this, node, 'o')
 }
-inherits(Output, Connector)
+inherits(OutputPin, Pin)
 
 function Node(x, y, w, h) {
   Rect.call(this, x, y, w, h)
-  mixin(this, {
-    corner_radius: 5,
-    inputs: [], outputs: [],
-    scene: null
+  mixin(this,
+  { corner_radius: 5
+  , inputs: [], outputs: []
+  , scene: null
   })
 }
 inherits(Node, Rect, {
   addInput: chain(function() {
-    this.inputs.push(new Input(this))
+    this.inputs.push(new InputPin(this))
   }),
   addOutput: chain(function() {
-    this.outputs.push(new Output(this))
+    this.outputs.push(new OutputPin(this))
   }),
   findZone: function(x, y) {
     var res = null
@@ -159,18 +184,18 @@ inherits(Node, Rect, {
     var ctx = this.scene.context
       , x = this.x, y = this.y
       , w = this.w, h = this.h
-      , corner_radius = this.corner_radius
+      , r = this.corner_radius
 
     ctx.beginPath()
-    ctx.moveTo(x + corner_radius, y)
-    ctx.lineTo(x + w - corner_radius, y)
-    ctx.quadraticCurveTo(x + w, y, x + w, y + corner_radius)
-    ctx.lineTo(x + w, y + h - corner_radius)
-    ctx.quadraticCurveTo(x + w, y + h, x + w - corner_radius, y + h)
-    ctx.lineTo(x + corner_radius, y + h)
-    ctx.quadraticCurveTo(x, y + h, x, y + h - corner_radius)
-    ctx.lineTo(x, y + corner_radius)
-    ctx.quadraticCurveTo(x, y, x + corner_radius, y)
+    ctx.moveTo(x + r, y)
+    ctx.lineTo(x + w - r, y)
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+    ctx.lineTo(x + w, y + h - r)
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+    ctx.lineTo(x + r, y + h)
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+    ctx.lineTo(x, y + r)
+    ctx.quadraticCurveTo(x, y, x + r, y)
     ctx.closePath()
     ctx.stroke()
 
@@ -179,130 +204,178 @@ inherits(Node, Rect, {
   }
 })
 
-function Scene(canvas) {
-  mixin(this, {
-    nodes: [],
-    edges: [],
-
-    _selected: null,
-
-    canvas: canvas, $canvas: $(canvas),
-    context: canvas.getContext("2d"),
+function Cursor(scene) {
+  Point.call(this, 0, 0)
+  mixin(this,
+  { scene: scene
+  , _mode: 'NONE'
+  , _selected: null
+  , _target: null
+  , _offset: new Point(0,0)
   })
-  this.context.translate(0.5, 0.5)
 
-  var _cursor = {x: 0, y: 0}
-    , _offset = new Point(0,0)
-    , _target = null
-
-  this.$canvas.on('mousedown', function(ev) {
-      switch (this.mode) {
-      case 'DRAG':
-        this.mode = 'NONE'
-        this._selected = null
-        break
-      case 'DELETE':
-        var elem = this.findZone(_cursor.x, _cursor.y)
-        if (elem instanceof Node) {
-          this.remove_node(elem)
-          this.draw()
-        }
-        this.mode = 'NONE'
-        this.$canvas.removeClass('delete-mode')
-        break
-      case 'BUBBLE':
-        this.mode = 'CONNECT'
-        var elem = this.findZone(_cursor.x, _cursor.y)
-        if (elem instanceof Connector && elem.edge != null) {
-          this._selected = elem.type == 'i' ? elem.edge.start : elem.edge.end
-          elem.edge.disconnect()
-          _target = null
-        }
-        break
-      case 'CONNECT':
-        break
-      default:
-        var elem = this.findZone(_cursor.x, _cursor.y)
-        if (elem instanceof Node) {
-          this.mode = 'DRAG'
-          this._selected = elem
-          _offset = new Point(_cursor.x - elem.x, _cursor.y - elem.y)
-          break
-        }
-      }
-      return false
-    }.bind(this)).on('mouseup', function (ev) {
-      switch (this.mode) {
-      case 'CONNECT':
-        if (_target != null) {
-          this._selected.connect(_target)
-
-          _target.bubble = false
-          _target = null
-        }
-        this._selected.bubble = false
-        this._selected = null
-        this.mode = 'NONE'
-        break
-      case 'BUBBLE':
-        break
-      default:
-        this.mode = 'NONE'
-        this._selected = null
-      }
-      return false
-    }.bind(this)).on('mousemove', function (ev) {
-      _cursor = get_mouse_cursor(ev)
-      switch (this.mode) {
-      case 'DRAG':
-        this._selected.move(_cursor.x - _offset.x, _cursor.y - _offset.y)
-        this.draw()
-        break
-      case 'CONNECT':
-        var elem = this.findZone(_cursor.x, _cursor.y)
-        if (elem instanceof Connector && elem.type != this._selected.type) {
-          if (_target != null && _target != elem) {
-            _target.bubble = false
-          }
-          elem.bubble = true
-          _target = elem
-        } else if (_target != null) {
-          _target.bubble = false
-          _target = null
-        }
-
-        this.draw()
-        draw_nice_bezier(this._selected, _cursor, this.context,
-            this._selected.type == (this._selected.x < _cursor.x ? 'i' : 'o'))
-        break
-      case 'BUBBLE':
-        if (this._selected != this.findZone(_cursor.x, _cursor.y)) {
-          this._selected.bubble = false
-          this._selected = null
-          this.mode = 'NONE'
-        }
-        break
-      default:
-        var elem = this.findZone(_cursor.x, _cursor.y)
-        if (elem instanceof Connector) {
-          elem.bubble = true
-          this._selected = elem
-          this.mode = 'BUBBLE'
-        }
-      }
-      return false
-    }.bind(this))
+  $(scene.canvas).on('mouseup mousedown mousemove', function(ev) {
+    this.updateFromEvent(ev)
+    var handler = Cursor.modes[this._mode].events[ev.type]
+    if (handler)
+      handler.call(this)
+    return false
+  }.bind(this))
 }
-Scene.modes = Enum('NONE', 'DRAG', 'CONNECT', 'BUBBLE', 'DELETE')
-mixin(Scene.prototype, {
-  get mode(m) { return this._mode || 'NONE' },
-  set mode(m) {
-    if (m in Scene.modes) {
-      this._mode = m
-    } else {
-      throw('Invalid Scene mode: ' + m)
+inherits(Cursor, Point, {
+  updateFromEvent: chain(function(ev) {
+    if (ev.layerX || ev.layerX == 0) { // Firefox
+      this.move(ev.layerX, ev.layerY)
+    } else if (ev.offsetX || ev.offsetX == 0) { // Opera
+      this.move(ev.offsetX, ev.offsetY)
+    }
+  }),
+  mode: function(m) {
+    if (arguments.length == 0)
+      return this._mode
+
+    var modes = Cursor.modes
+      , args  = Array.prototype.slice.call(arguments, 1)
+    if (!(m in modes))
+      throw('Invalid mode: ' + m)
+
+    modes[this._mode].exit && modes[this._mode].exit.call(this)
+    this._mode = m
+    modes[this._mode].enter && modes[this._mode].enter.apply(this, args)
+  },
+})
+Cursor.modes = {
+  NONE: {
+    enter: function() {
+      if (this._selected && this._selected.bubble)
+        this._selected.bubble = false
+      this._selected = null
+    },
+    events: {
+      mousemove: function() {
+        var elem = this.scene.findZone(this.x, this.y)
+        if (elem instanceof Pin) {
+          this.mode('BUBBLE', elem)
+        }
+      },
+      mousedown: function() {
+        var elem = this.scene.findZone(this.x, this.y)
+        if (elem instanceof Node) {
+          this.mode('DRAG', elem)
+        }
+      },
     }
   },
+  DRAG: {
+    enter: function(elem, offset) {
+      this._selected = elem
+      if (offset)
+        this._offset.move(offset.x, offset.y)
+      else
+        this._offset.move(this.x - elem.x, this.y - elem.y)
+    },
+    events: {
+      mouseup: function() {
+        this.mode('NONE')
+      },
+      mousemove: function() {
+        this._selected.move(this.x - this._offset.x,
+                            this.y - this._offset.y)
+        this.scene.draw()
+      },
+    }
+  },
+  CONNECT: {
+    enter: function() {
+      this._connector = new Edge(this._selected, this)
+      this.scene.addEdge(this._connector)
+    },
+    exit: function() {
+      this.scene.removeEdge(this._connector)
+      this._connector = null
+    },
+    events: {
+      mouseup: function() {
+        if (this._target != null) {
+          this._selected.connect(this._target)
+
+          this._target.bubble = false
+          this._target = null
+        }
+        this.mode('NONE')
+      },
+      mousemove: function() {
+        var elem = this.scene.findZone(this.x, this.y)
+        if (elem instanceof Pin && elem.type != this._selected.type) {
+          if (this._target != null && this._target != elem) {
+            this._target.bubble = false
+          }
+          elem.bubble = true
+          this._target = elem
+        } else if (this._target != null) {
+          this._target.bubble = false
+          this._target = null
+        }
+
+        this.scene.draw()
+        this._connector.draw()
+      },
+    }
+  },
+  BUBBLE: {
+    enter: function(elem) {
+      this._selected = elem
+      this._selected.bubble = true
+    },
+    events: {
+      mousemove: function() {
+        if (this._selected != this.scene.findZone(this.x, this.y)) {
+          this.mode('NONE')
+        }
+      },
+      mousedown: function() {
+        this.mode('CONNECT')
+        var elem = this.scene.findZone(this.x, this.y)
+        if (elem instanceof Pin && elem.edge != null) {
+          this._selected = (elem.type == 'i' ? elem.edge.start : elem.edge.end)
+          elem.edge.disconnect()
+          this._target = null
+        }
+      },
+    }
+  },
+  DELETE: {
+    enter: function() {
+      $(this.scene.canvas).addClass('delete-mode')
+    },
+    exit: function() {
+      $(this.scene.canvas).removeClass('delete-mode')
+    },
+    events: {
+      mousedown: function() {
+        var elem = this.scene.findZone(this.x, this.y)
+        if (elem instanceof Node) {
+          this.scene.removeNode(elem)
+        }
+        this.mode('NONE')
+      },
+    }
+  },
+}
+
+function Scene(canvas) {
+  mixin(this,
+  { nodes: []
+  , edges: []
+
+  , canvas: canvas
+  , context: canvas.getContext("2d")
+  })
+  this.cursor = new Cursor(this)
+  this.context.translate(0.5, 0.5)
+}
+
+mixin(Scene.prototype, {
   addEdge: chain(function(edge) {
     this.edges.push(edge)
   }),
@@ -314,11 +387,11 @@ mixin(Scene.prototype, {
   addNode: chain(function(node, interactive) {
     this.nodes.push(node)
     node.scene = this
-    node.draw()
 
     if (interactive) {
-      this._selected = node
-      this.mode = 'DRAG'
+      this.cursor.mode('DRAG', node, new Point(0, 0))
+    } else {
+      node.draw()
     }
   }),
   removeNode: chain(function(node, interactive) {
@@ -332,8 +405,9 @@ mixin(Scene.prototype, {
     }
 
     if (interactive) {
-      this.mode = 'DELETE'
-      this.$canvas.addClass('delete-mode')
+      this.cursor.mode('DELETE')
+    } else {
+      this.scene.draw()
     }
   }),
   draw: function() {
@@ -343,9 +417,7 @@ mixin(Scene.prototype, {
   findZone: function(x, y) {
     var res = null
     this.nodes.some(function(elem) {
-      if (res = elem.findZone(x, y)) {
-        return true
-      }
+      return res = elem.findZone(x, y)
     })
     return res
   }
@@ -369,45 +441,6 @@ function chain(fx) {
     fx.apply(this, arguments)
     return this
   }
-}
-function Enum() {
-  var o = {}
-  Array.prototype.forEach.call(arguments, function(l, i) { o[l] = i })
-  return o
-}
-
-function get_mouse_cursor(ev) {
-  if (ev.layerX || ev.layerX == 0) { // Firefox
-    return { x: ev.layerX, y: ev.layerY }
-  } else if (ev.offsetX || ev.offsetX == 0) { // Opera
-    return { x: ev.offsetX, y: ev.offsetY }
-  }
-}
-
-function draw_nice_bezier(start, end, ctx, reverse) {
-  ctx.save()
-  var dist = {
-    w: Math.abs(end.x - start.x),
-    h: Math.abs(end.y - start.y)
-  }
-  if (reverse) {
-    ctx.moveTo(start.x, start.y)
-    ctx.bezierCurveTo(start.x, start.y + dist.h/3 * (end.y > start.y ? 1 : -1),
-                      end.x, end.y - dist.h/3 * (end.y > start.y ? 1 : -1),
-                      end.x, end.y)
-  } else {
-    if (start.x > end.x) {
-      var tmp = start
-      start = end
-      end = tmp
-    }
-    ctx.moveTo(start.x, start.y)
-    ctx.bezierCurveTo(start.x + dist.w/3, start.y,
-                      end.x - dist.w/3, end.y,
-                      end.x, end.y)
-  }
-  ctx.stroke()
-  ctx.restore()
 }
 
 // vim: ts=2 sw=2 et sts=0
