@@ -14,7 +14,8 @@ with(NodeView) {
     {
       Point.prototype.move.call(this, x, y)
     },
-    move: function(x, y) {
+    move: function(x, y)
+    {
       mixin(this, {x: x, y: y})
     }
   })
@@ -58,7 +59,8 @@ with(NodeView) {
       mixin(this, { start: reverse ? end : start
                   , end:   reverse ? start : end })
     },
-    draw: function() {
+    draw: function()
+    {
       if (!this.start || !this.end)
         return
 
@@ -94,7 +96,8 @@ with(NodeView) {
     },
   })
   NodeView.Pin = MOP.Class(Circle, {
-    constructor: function(node, type) {
+    constructor: function(node, type)
+    {
       Circle.call(this, node.x, node.y, 3)
 
       mixin(this,
@@ -108,25 +111,30 @@ with(NodeView) {
     },
     get scene() { return this.node.scene },
     get bubble() { return this._bubble },
-    set bubble(state) {
+    set bubble(state)
+    {
       var old = this._bubble
       this._bubble = state
       if (old != state)
         this.scene.draw()
     },
-    get number() {
+    get number()
+    {
       return this.port.indexOf(this) + 1
     },
-    connect: function(target, edge) {
+    connect: function(target, edge)
+    {
       edge = edge || new Edge(target, this, this.type != 'i')
       this.edges.push(edge)
       this.scene.addEdge(edge)
     },
-    disconnect: function() {
+    disconnect: function()
+    {
       this.edges.map(function(edge) { this.scene.removeEdge(edge) }.bind(this))
       this.edges = []
     },
-    draw: function() {
+    draw: function()
+    {
       var ctx = this.scene.context
         , arc_start = Math.PI/2 * (this.type == 'i' ? 1 : -1)
 
@@ -176,7 +184,8 @@ with(NodeView) {
     {
       Port.call(this, node)
     },
-    findZone: function(x, y) {
+    findZone: function(x, y)
+    {
       var h = node.coldet(x + 2, y) - node.coldet(x - 2, y)
         , v = node.coldet(x, y + 2) - node.coldet(x, y - 2)
 
@@ -193,13 +202,16 @@ with(NodeView) {
       , scene: null
       })
     },
-    addInput: chain(function() {
+    addInput: chain(function()
+    {
       this.inputs.push(new InputPin(this))
     }),
-    addOutput: chain(function() {
+    addOutput: chain(function()
+    {
       this.outputs.push(new OutputPin(this))
     }),
-    findZone: function(x, y) {
+    findZone: function(x, y)
+    {
       var res = null
       this.inputs.concat(this.outputs).some(function(elem) {
         if (elem.coldet(x, y)) {
@@ -210,7 +222,8 @@ with(NodeView) {
       res = res || this.coldet(x, y) && this
       return res
     },
-    draw: function() {
+    draw: function()
+    {
       var ctx = this.scene.context
         , x = this.x, y = this.y
         , w = this.w, h = this.h
@@ -255,7 +268,8 @@ with(NodeView) {
     modes: {
       NORMAL: {}
     },
-    mode: function(m) {
+    mode: function(m)
+    {
       if (arguments.length == 0)
         return this._mode
 
@@ -270,10 +284,12 @@ with(NodeView) {
     },
   })
   NodeView.Cursor = MOP.Class(Point, {
-    constructor: function() {
+    constructor: function()
+    {
       Point.call(this, 0, 0)
     },
-    updateFromEvent: chain(function(ev) {
+    updateFromEvent: chain(function(ev)
+    {
       if (ev.layerX || ev.layerX == 0) { // Firefox
         this.move(ev.layerX, ev.layerY)
       } else if (ev.offsetX || ev.offsetX == 0) { // Opera
@@ -301,33 +317,40 @@ with(NodeView) {
     },
     modes: {
       NORMAL: {
-        enter: function() {
+        enter: function()
+        {
           this.draw()
         },
         events: {
-          mousemove: function(elem) {
+          mousemove: function(elem)
+          {
             if (elem instanceof Pin)
               this.mode('BUBBLE', elem)
           },
-          mousedown: function(elem) {
+          mousedown: function(elem)
+          {
             if (elem instanceof Node)
               this.mode('DRAG', elem)
           },
         }
       },
       DRAG: {
-        enter: function(elem, offset) {
+        enter: function(elem, offset)
+        {
           this._dragging = elem
           this._offset = offset || new Point(this.cursor.x - elem.x, this.cursor.y - elem.y)
         },
-        exit: function(elem, offset) {
+        exit: function(elem, offset)
+        {
           this._dragging = this._offset = null
         },
         events: {
-          mouseup: function() {
+          mouseup: function()
+          {
             this.mode('NORMAL')
           },
-          mousemove: function() {
+          mousemove: function()
+          {
             this._dragging.move(this.cursor.x - this._offset.x,
                                 this.cursor.y - this._offset.y)
             this.draw()
@@ -335,20 +358,24 @@ with(NodeView) {
         }
       },
       BUBBLE: {
-        enter: function(elem) {
+        enter: function(elem)
+        {
           this._bubbled = elem
           this._bubbled.bubble = true
         },
-        exit: function(elem) {
+        exit: function(elem)
+        {
           this._bubbled.bubble = false
           this._bubbled = null
         },
         events: {
-          mousemove: function(elem) {
+          mousemove: function(elem)
+          {
             if (this._bubbled != elem)
               this.mode('NORMAL')
           },
-          mousedown: function(elem) {
+          mousedown: function(elem)
+          {
             this.mode('CONNECT', this._bubbled)
             if (elem instanceof Pin && elem.edges.length > 0) {
               this._startPin.disconnect()
@@ -357,13 +384,15 @@ with(NodeView) {
         }
       },
       CONNECT: {
-        enter: function(start) {
+        enter: function(start)
+        {
           this._startPin = start
           this._endPin = null
           this._connector = new Edge(this._startPin, this.cursor)
           this.addEdge(this._connector)
         },
-        exit: function() {
+        exit: function()
+        {
           this.removeEdge(this._connector)
           if (this._startPin)
             this._startPin.bubble = false
@@ -372,7 +401,8 @@ with(NodeView) {
           this._connector = this._startPin = this._endPin = null
         },
         events: {
-          mouseup: function() {
+          mouseup: function()
+          {
             if (this._endPin != null) {
               this._connector.end = this._endPin
               this._startPin.connect(this._endPin, this._connector)
@@ -381,7 +411,8 @@ with(NodeView) {
             }
             this.mode('NORMAL')
           },
-          mousemove: function(elem) {
+          mousemove: function(elem)
+          {
             if (elem instanceof Pin && elem.type != this._startPin.type) {
               if (this._endPin && this._endPin != elem) {
                 this._endPin.bubble = false
@@ -398,14 +429,17 @@ with(NodeView) {
         }
       },
       DELETE: {
-        enter: function() {
+        enter: function()
+        {
           $(this.canvas).addClass('delete-mode')
         },
-        exit: function() {
+        exit: function()
+        {
           $(this.canvas).removeClass('delete-mode')
         },
         events: {
-          mousedown: function(elem) {
+          mousedown: function(elem)
+          {
             if (elem instanceof Node) {
               this.removeNode(elem)
             }
@@ -414,15 +448,18 @@ with(NodeView) {
         }
       },
     },
-    addEdge: chain(function(edge) {
+    addEdge: chain(function(edge)
+    {
       this.edges.push(edge)
     }),
-    removeEdge: chain(function(edge) {
+    removeEdge: chain(function(edge)
+    {
       var pos = this.edges.indexOf(edge)
       if (pos >= 0)
         this.edges.splice(pos, 1)
     }),
-    addNode: chain(function(node, interactive) {
+    addNode: chain(function(node, interactive)
+    {
       this.nodes.push(node)
       node.scene = this
 
@@ -432,7 +469,8 @@ with(NodeView) {
         node.draw()
       }
     }),
-    removeNode: chain(function(node, interactive) {
+    removeNode: chain(function(node, interactive)
+    {
       var pos = this.nodes.indexOf(node)
       if (pos >= 0) {
         node.inputs.concat(node.outputs).forEach(function(elem) {
@@ -448,11 +486,13 @@ with(NodeView) {
         this.draw()
       }
     }),
-    draw: function() {
+    draw: function()
+    {
       this.context.clearRect(0,0, this.canvas.width, this.canvas.height)
       this.nodes.concat(this.edges).forEach(function(elem) {elem.draw()})
     },
-    findZone: function(x, y) {
+    findZone: function(x, y)
+    {
       var res = null
       this.nodes.some(function(elem) {
         return res = elem.findZone(x, y)
@@ -464,12 +504,14 @@ with(NodeView) {
 
 // Utility functions
 
-function mixin(a, b) {
+function mixin(a, b)
+{
   Object.keys(b).forEach(function(k) {
     Object.defineProperty(a, k, Object.getOwnPropertyDescriptor(b, k))
   })
 }
-function chain(fx) {
+function chain(fx)
+{
   return function() {
     fx.apply(this, arguments)
     return this
