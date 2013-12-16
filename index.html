@@ -59,17 +59,18 @@
     <canvas id="canvas" width="500" height="480"></canvas>
 
     <script type="application/javascript" src="jquery-2.0.3.min.js"></script>
+    <script type="application/javascript" src="MOP.js"></script>
     <script type="application/javascript" src="nodeView.js"></script>
     <script type="application/javascript">
       $(function() {
-        scene = new Scene($('#canvas')[0])
+        scene = new NodeView.Scene($('#canvas')[0])
         scene.context.fillStyle = "white"
         scene.context.strokeStyle = "white"
         scene.draw()
 
         new_node = function() {
           scene.addNode(
-            new Node(0, 0, 100, 50).addInput().addInput().addInput().addOutput(),
+            new NodeView.Node(0, 0, 100, 50).addInput().addInput().addInput().addOutput(),
             true
           )
         }
