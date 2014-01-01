@@ -36,6 +36,7 @@ MOP = {
       init.apply(o, arguments)
       return o
     }
+    init.super = base
 
     return init
   }

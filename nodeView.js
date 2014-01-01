@@ -16,7 +16,8 @@ NodeView = (function()
     },
     move: function(x, y)
     {
-      mixin(this, {x: x, y: y})
+      this.x = x
+      this.y = y
     },
     export: function()
     {
@@ -28,12 +29,13 @@ NodeView = (function()
     constructor: function(o)
     {
       o = defaults(o, { w:0, h:0 })
-      Point.call(this, o)
+      Rect.super.call(this, o)
       this.resize(o.w, o.h)
     },
     resize: function(w, h)
     {
-      mixin(this, {w: w, h: h})
+      this.w = w
+      this.h = h
     },
     coldet: function(x, y)
     {
@@ -42,7 +44,7 @@ NodeView = (function()
     },
     export: function()
     {
-      return extend(Point.prototype.export.call(this), {w: this.w, h: this.h})
+      return extend(Rect.super.prototype.export.call(this), { w: this.w, h: this.h })
     },
   })
 
@@ -50,7 +52,7 @@ NodeView = (function()
     constructor: function(o)
     {
       o = defaults(o, { tolerance:0 })
-      Point.call(this, o)
+      Circle.super.call(this, o)
       this.tolerance = o.tolerance
       this.resize(o.r)
     },
@@ -66,7 +68,7 @@ NodeView = (function()
     },
     export: function()
     {
-      return extend(Point.prototype.export.call(this), {r: this.r})
+      return extend(Circle.super.prototype.export.call(this), { r: this.r })
     },
   })
 
@@ -125,14 +127,12 @@ NodeView = (function()
   var Pin = MOP.Class(Circle, {
     constructor: function(node, type)
     {
-      this.r = 3
-      //Circle.call(this, { x:node.x, y:node.y, r:3 })
+      Circle.call(this, { r:3 })
 
       mixin(this,
       { type: type
       , node: node
       , port: type == 'i' ? node.inputs : node.outputs
-      , edges: []
       , _bubble: false
       , tolerance: 3
       })
@@ -150,17 +150,10 @@ NodeView = (function()
     {
       return this.port.indexOf(this) + 1
     },
-    connect: function(target)
-    {
-      var edge = Edge.new(this, target)
-      if (this.edges.indexOf(edge) > -1)
-        this.edges.push(edge)
-      this.scene.addEdge(edge)
-    },
     disconnect: function()
     {
-      this.edges.forEach(function(e) { this.scene.removeEdge(e) }, this)
-      this.edges = []
+      this.scene.edges.filter(function(e) { return e.start == this || e.end == this }, this)
+                      .forEach(function(e) { this.scene.removeEdge(e) }, this)
     },
     draw: function()
     {
@@ -192,14 +185,14 @@ NodeView = (function()
   var InputPin = MOP.Class(Pin, {
     constructor: function(node)
     {
-      Pin.call(this, node, 'i')
+      InputPin.super.call(this, node, 'i')
     }
   })
 
   var OutputPin = MOP.Class(Pin, {
     constructor: function(node)
     {
-      Pin.call(this, node, 'o')
+      OutputPin.super.call(this, node, 'o')
     }
   })
 
@@ -207,12 +200,14 @@ NodeView = (function()
     constructor: function(o)
     {
       o = defaults(o, { inputs:0, outputs:0, corner_radius:5 })
-      Rect.call(this, o)
+      Node.super.call(this, o)
+
       mixin(this,
       { corner_radius: o.corner_radius
       , inputs: [], outputs: []
       , scene: o.scene || null
       })
+
       var c
       for (c = 0; c < o.inputs; ++c)
         this.addInput()
@@ -263,7 +258,7 @@ NodeView = (function()
     },
     export: function()
     {
-      return extend(Rect.prototype.export.call(this), {
+      return extend(Node.super.prototype.export.call(this), {
         inputs: this.inputs.length,
         outputs: this.outputs.length
       })
@@ -275,12 +270,10 @@ NodeView = (function()
     {
       o = defaults(o, { label:"", font_size:12 })
       o.h = Math.max(o.h, o.font_size + 4)
-      Node.call(this, o)
+      LabelNode.super.call(this, o)
 
-      mixin(this,
-      { label: o.label
-      , font_size: o.font_size
-      })
+      this.label = o.label
+      this.font_size = o.font_size
     },
     draw: function()
     {
@@ -295,13 +288,11 @@ NodeView = (function()
       var tw = ctx.measureText(this.label).width
       this.resize(Math.max(tw + 20, this.w), this.h)
 
-      Node.prototype.draw.call(this)
+      LabelNode.super.prototype.draw.call(this)
     },
     export: function()
     {
-      return extend(Node.prototype.export.call(this), {
-        label: this.label
-      })
+      return extend(LabelNode.super.prototype.export.call(this), { label: this.label })
     },
   })
 
@@ -348,7 +339,7 @@ NodeView = (function()
   var Cursor = MOP.Class(Point, {
     constructor: function()
     {
-      Point.call(this)
+      Cursor.super.call(this)
     },
     updateFromEvent: chain(function(ev)
     {
@@ -374,7 +365,7 @@ NodeView = (function()
       })
       this.context.translate(0.5, 0.5)
 
-      Modal.call(this, $(canvas), function(ev) {
+      Scene.super.call(this, $(canvas), function(ev) {
         this.cursor.updateFromEvent(ev)
         return this.findZone(this.cursor.x, this.cursor.y)
       }.bind(this))
@@ -441,9 +432,9 @@ NodeView = (function()
           },
           mousedown: function(elem)
           {
-            if (elem instanceof Pin && elem.type == 'i')
-              elem.disconnect()
-            this.mode('CONNECT', elem)
+            if (this._bubbled instanceof Pin && this._bubbled.type == 'i')
+              this._bubbled.disconnect()
+            this.mode('CONNECT', this._bubbled)
           },
         }
       },
@@ -468,9 +459,7 @@ NodeView = (function()
           mouseup: function(elem)
           {
             if (this._endPin != null && this._endPin == elem) {
-              this._startPin.connect(this._endPin)
-            } else {
-              this.removeEdge(this._connector)
+              this.addEdge(Edge.new(this._startPin, this._endPin))
             }
             this.mode('NORMAL')
           },
@@ -513,8 +502,10 @@ NodeView = (function()
     },
     addEdge: chain(function(edge)
     {
-      if (this.edges.indexOf(edge) < 0)
-        this.edges.push(edge)
+      if (this.edges.some(function(e) { return e.start == edge.start && e.end == edge.end }))
+        return
+
+      this.edges.push(edge)
       edge.scene = this
 
       this.draw()
