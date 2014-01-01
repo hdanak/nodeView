@@ -63,14 +63,14 @@
     <script type="application/javascript" src="nodeView.js"></script>
     <script type="application/javascript">
       $(function() {
-        scene = new NodeView.Scene($('#canvas')[0])
+        scene = NodeView.Scene.new($('#canvas')[0])
         scene.context.fillStyle = "white"
         scene.context.strokeStyle = "white"
         scene.draw()
 
         new_node = function() {
           scene.addNode(
-            new NodeView.Node(0, 0, 100, 50).addInput().addInput().addInput().addOutput(),
+            NodeView.Node.new({x:0, y:0, w:100, h:50, inputs:3, outputs:1}),
             true
           )
         }
